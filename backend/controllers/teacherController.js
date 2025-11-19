@@ -107,7 +107,9 @@ exports.getStudents = async (req, res) => {
       FROM students s
       JOIN enrollments e ON s.id = e.student_id
       JOIN course_offerings co ON e.course_offering_id = co.id
-      WHERE co.teacher_id = ? AND e.enrollment_type = 'course'
+      WHERE co.teacher_id = ?
+        AND e.enrollment_type = 'course'
+        AND e.status = 'aceptado'
     `, [teacherId]);
     res.json(students);
   } catch (err) {
@@ -136,6 +138,22 @@ exports.markAttendance = async (req, res) => {
 
     if (!courseCheck.length) {
       return res.status(403).json({ message: 'No tienes permiso para marcar asistencia en este curso' });
+    }
+
+    // Verificar que el estudiante tenga una matrícula aceptada en el course_offering de este schedule
+    const [enrollmentCheck] = await db.query(`
+      SELECT e.id
+      FROM enrollments e
+      JOIN schedules s ON s.course_offering_id = e.course_offering_id
+      WHERE s.id = ?
+        AND e.student_id = ?
+        AND e.enrollment_type = 'course'
+        AND e.status = 'aceptado'
+      LIMIT 1
+    `, [schedule_id, student_id]);
+
+    if (!enrollmentCheck.length) {
+      return res.status(400).json({ message: 'El estudiante no tiene una matrícula aceptada en este curso' });
     }
 
     // Verificar si ya existe asistencia para esta fecha

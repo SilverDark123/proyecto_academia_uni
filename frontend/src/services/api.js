@@ -188,6 +188,10 @@ export const enrollmentsAPI = {
     method: 'PUT',
     body: JSON.stringify({ enrollment_id: enrollmentId, status }),
   }),
+  cancel: (enrollmentId) => request('/enrollments/cancel', {
+    method: 'POST',
+    body: JSON.stringify({ enrollment_id: enrollmentId }),
+  }),
   getByOffering: (type, id, status = 'aceptado') => {
     const params = new URLSearchParams({ type, id, status });
     return request(`/enrollments/by-offering?${params.toString()}`);

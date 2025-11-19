@@ -81,12 +81,17 @@ const AdminDashboard = () => {
       ? dashboard
       : dashboard.filter((row) => row.cycle_id === selectedCycleId);
 
-  // Opciones de curso para pestaña de asistencia (solo cursos)
+  // Opciones de curso+grupo para pestaña de asistencia (solo cursos)
   const courseOptions = Array.from(
     new Map(
       filteredDashboard
         .filter((row) => row.enrollment_type === 'course')
-        .map((row) => [row.enrolled_item, { name: row.enrolled_item }])
+        .map((row) => {
+          const label = row.grupo
+            ? `${row.enrolled_item} - Grupo ${row.grupo}`
+            : row.enrolled_item;
+          return [label, { name: label }];
+        })
     ).values()
   );
 
@@ -481,9 +486,13 @@ const AdminDashboard = () => {
               <TableBody>
                 {filteredDashboard
                   .filter((row) => row.enrollment_type === 'course')
-                  .filter((row) =>
-                    selectedCourse === 'all' ? true : row.enrolled_item === selectedCourse
-                  )
+                  .filter((row) => {
+                    if (selectedCourse === 'all') return true;
+                    const label = row.grupo
+                      ? `${row.enrolled_item} - Grupo ${row.grupo}`
+                      : row.enrolled_item;
+                    return label === selectedCourse;
+                  })
                   .map((row) => (
                     <TableRow key={`${row.student_id}-${row.enrollment_id}`}>
                       <TableCell>{row.student_name}</TableCell>

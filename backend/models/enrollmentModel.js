@@ -12,16 +12,16 @@ const Enrollment = {
       // Regla 1: evitar duplicados exactos
       if (type === 'course') {
         const [dupCourse] = await db.query(
-          'SELECT id FROM enrollments WHERE student_id = ? AND course_offering_id = ? AND enrollment_type = ? AND status != ? LIMIT 1',
-          [studentId, offering_id, 'course', 'cancelado']
+          'SELECT id FROM enrollments WHERE student_id = ? AND course_offering_id = ? AND enrollment_type = ? AND status = ? LIMIT 1',
+          [studentId, offering_id, 'course', 'aceptado']
         );
         if (dupCourse.length) {
           throw new Error('El estudiante ya está matriculado en este curso');
         }
       } else if (type === 'package') {
         const [dupPack] = await db.query(
-          'SELECT id FROM enrollments WHERE student_id = ? AND package_offering_id = ? AND enrollment_type = ? AND status != ? LIMIT 1',
-          [studentId, offering_id, 'package', 'cancelado']
+          'SELECT id FROM enrollments WHERE student_id = ? AND package_offering_id = ? AND enrollment_type = ? AND status = ? LIMIT 1',
+          [studentId, offering_id, 'package', 'aceptado']
         );
         if (dupPack.length) {
           throw new Error('El estudiante ya está matriculado en este paquete');
@@ -43,7 +43,7 @@ const Enrollment = {
            JOIN package_offering_courses poc ON poc.package_offering_id = e.package_offering_id
            WHERE e.student_id = ?
              AND e.enrollment_type = 'package'
-             AND e.status != 'cancelado'
+             AND e.status = 'aceptado'
              AND poc.course_offering_id = ?
            LIMIT 1`,
           [studentId, offering_id]
@@ -62,7 +62,7 @@ const Enrollment = {
              JOIN course_offerings co ON co.id = ?
              WHERE e.student_id = ?
                AND e.enrollment_type = 'package'
-               AND e.status != 'cancelado'
+               AND e.status = 'aceptado'
                AND po.cycle_id = co.cycle_id
                AND pc.course_id = co.course_id
              LIMIT 1`,
@@ -87,7 +87,7 @@ const Enrollment = {
            JOIN package_offering_courses poc ON poc.course_offering_id = e.course_offering_id
            WHERE e.student_id = ?
              AND e.enrollment_type = 'course'
-             AND e.status != 'cancelado'
+             AND e.status = 'aceptado'
              AND poc.package_offering_id = ?
            LIMIT 1`,
           [studentId, offering_id]
@@ -104,7 +104,7 @@ const Enrollment = {
              JOIN package_courses pc ON pc.course_id = co.course_id
              WHERE e.student_id = ?
                AND e.enrollment_type = 'course'
-               AND e.status != 'cancelado'
+               AND e.status = 'aceptado'
                AND co.cycle_id = ?
                AND pc.package_id = ?
              LIMIT 1`,
@@ -165,10 +165,14 @@ const Enrollment = {
         [paymentPlanId, 1, amount, 'pending']
       );
 
-      created.push({ enrollmentId, type, offering_id, amount, payment_plan_id: paymentPlanId, installment_id: inst.insertId });
+      // Entrada base para esta matrícula
+      const baseEntry = { enrollmentId, type, offering_id, amount, payment_plan_id: paymentPlanId, installment_id: inst.insertId };
+      created.push(baseEntry);
 
       // Si es paquete, crear también matrículas por course_offerings exactos del paquete para que los docentes vean a los alumnos
+      // y guardar la lista de cursos en baseEntry.courses para mostrar al alumno el detalle del paquete.
       if (type === 'package') {
+        baseEntry.courses = [];
         try {
           // 1) Intentar obtener mapeo exacto: course_offerings vinculados al package_offering
           const [pocRows] = await db.query(
@@ -189,6 +193,26 @@ const Enrollment = {
                 [studentId, coId, offering_id, 'course', 'pendiente']
               );
               created.push({ enrollmentId: resCourse.insertId, type: 'course', offering_id: coId });
+
+              // Agregar info de curso + grupo a la descripción del paquete
+              try {
+                const [courseInfo] = await db.query(
+                  `SELECT c.name, co.group_label
+                   FROM course_offerings co
+                   JOIN courses c ON co.course_id = c.id
+                   WHERE co.id = ?
+                   LIMIT 1`,
+                  [coId]
+                );
+                if (courseInfo.length) {
+                  baseEntry.courses.push({
+                    name: courseInfo[0].name,
+                    group: courseInfo[0].group_label || null,
+                  });
+                }
+              } catch (_) {
+                // No bloquear por fallos de descripción
+              }
             }
           } else {
             // 2) Fallback: comportamiento anterior basado en package_courses y ciclo
@@ -220,6 +244,26 @@ const Enrollment = {
                     [studentId, coId, offering_id, 'course', 'pendiente']
                   );
                   created.push({ enrollmentId: resCourse.insertId, type: 'course', offering_id: coId });
+
+                  // Agregar info de curso + grupo a la descripción del paquete
+                  try {
+                    const [courseInfo] = await db.query(
+                      `SELECT c.name, co.group_label
+                       FROM course_offerings co
+                       JOIN courses c ON co.course_id = c.id
+                       WHERE co.id = ?
+                       LIMIT 1`,
+                      [coId]
+                    );
+                    if (courseInfo.length) {
+                      baseEntry.courses.push({
+                        name: courseInfo[0].name,
+                        group: courseInfo[0].group_label || null,
+                      });
+                    }
+                  } catch (_) {
+                    // No bloquear por fallos de descripción
+                  }
                 }
               }
             }
@@ -243,7 +287,27 @@ const Enrollment = {
         pp.id as payment_plan_id, pp.total_amount, pp.installments as total_installments,
         COALESCE(cyc.name, cyc2.name) as cycle_name,
         COALESCE(cyc.start_date, cyc2.start_date) as cycle_start_date,
-        COALESCE(cyc.end_date, cyc2.end_date) as cycle_end_date
+        COALESCE(cyc.end_date, cyc2.end_date) as cycle_end_date,
+        (
+          SELECT GROUP_CONCAT(
+                   CONCAT(
+                     c2.name,
+                     CASE
+                       WHEN co2.group_label IS NOT NULL AND co2.group_label <> ''
+                         THEN CONCAT(' (Grupo ', co2.group_label, ')')
+                       ELSE ''
+                     END
+                   )
+                   SEPARATOR ', '
+                 )
+          FROM enrollments e2
+          JOIN course_offerings co2 ON e2.course_offering_id = co2.id
+          JOIN courses c2 ON co2.course_id = c2.id
+          WHERE e2.student_id = e.student_id
+            AND e2.enrollment_type = 'course'
+            AND e2.status != 'cancelado'
+            AND e2.package_offering_id = e.package_offering_id
+        ) AS package_courses_summary
       FROM enrollments e
       LEFT JOIN course_offerings co ON e.course_offering_id = co.id
       LEFT JOIN courses c ON co.course_id = c.id
@@ -271,6 +335,78 @@ const Enrollment = {
     }
 
     return rows;
+  },
+
+  async cancelForStudent(studentId, enrollmentId) {
+    // Verificar que la matrícula pertenece al estudiante y está pendiente
+    const [rows] = await db.query(
+      'SELECT id, status, enrollment_type, package_offering_id FROM enrollments WHERE id = ? AND student_id = ? LIMIT 1',
+      [enrollmentId, studentId]
+    );
+
+    if (!rows.length) {
+      throw new Error('Matrícula no encontrada');
+    }
+
+    const enrollment = rows[0];
+    if (enrollment.status !== 'pendiente') {
+      throw new Error('Solo se pueden cancelar matrículas pendientes');
+    }
+
+    // Verificar que no existan cuotas pagadas ni vouchers subidos en la matrícula principal
+    const [ppRows] = await db.query(
+      'SELECT id FROM payment_plans WHERE enrollment_id = ? LIMIT 1',
+      [enrollmentId]
+    );
+
+    if (ppRows.length) {
+      const paymentPlanId = ppRows[0].id;
+
+      const [paidRows] = await db.query(
+        'SELECT COUNT(*) AS cnt FROM installments WHERE payment_plan_id = ? AND (status = ? OR voucher_url IS NOT NULL)',
+        [paymentPlanId, 'paid']
+      );
+
+      if (paidRows[0].cnt > 0) {
+        throw new Error('No se puede cancelar una matrícula con pagos o vouchers registrados');
+      }
+    }
+
+    // Si es una matrícula de paquete, también eliminar las matrículas de cursos asociadas a ese paquete
+    const idsToDelete = [enrollmentId];
+
+    if (enrollment.enrollment_type === 'package' && enrollment.package_offering_id) {
+      const [childEnrollments] = await db.query(
+        'SELECT id FROM enrollments WHERE student_id = ? AND enrollment_type = ? AND package_offering_id = ? AND status = ? ',
+        [studentId, 'course', enrollment.package_offering_id, 'pendiente']
+      );
+
+      for (const child of childEnrollments) {
+        idsToDelete.push(child.id);
+      }
+    }
+
+    // Eliminar planes de pago y cuotas asociados a todas las matrículas a borrar
+    for (const id of idsToDelete) {
+      const [ppDelRows] = await db.query(
+        'SELECT id FROM payment_plans WHERE enrollment_id = ? LIMIT 1',
+        [id]
+      );
+
+      if (ppDelRows.length) {
+        const planId = ppDelRows[0].id;
+        await db.query('DELETE FROM installments WHERE payment_plan_id = ?', [planId]);
+        await db.query('DELETE FROM payment_plans WHERE id = ?', [planId]);
+      }
+    }
+
+    // Eliminar las matrículas en sí
+    await db.query(
+      'DELETE FROM enrollments WHERE id IN (?)',
+      [idsToDelete]
+    );
+
+    return { message: 'Matrícula cancelada correctamente' };
   }
 };
 

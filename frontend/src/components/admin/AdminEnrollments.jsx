@@ -40,7 +40,7 @@ const AdminEnrollments = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {enrollments.map(e => (
+            {enrollments.filter(e => e.status !== 'cancelado').map(e => (
               <TableRow key={e.id}>
                 <TableCell>{e.id}</TableCell>
                 <TableCell>{e.first_name} {e.last_name}</TableCell>

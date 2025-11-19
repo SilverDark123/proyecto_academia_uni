@@ -19,4 +19,7 @@ router.get('/', enrollmentController.getAll);
 // Crear matrículas (solo estudiantes)
 router.post('/', restrictTo('student'), enrollmentController.create);
 
+// Cancelar matrícula propia (solo estudiantes)
+router.post('/cancel', restrictTo('student'), enrollmentController.cancelOwn);
+
 module.exports = router;

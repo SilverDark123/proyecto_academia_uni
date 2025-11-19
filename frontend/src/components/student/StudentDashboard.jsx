@@ -10,6 +10,7 @@ const StudentDashboard = () => {
   const [payments, setPayments] = useState([]);
   const [voucherFile, setVoucherFile] = useState(null);
   const [error, setError] = useState('');
+  const [activeCycle, setActiveCycle] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -18,6 +19,12 @@ const StudentDashboard = () => {
 
     fetch('http://localhost:4000/api/packages')
       .then(r => r.json()).then(setPackages).catch(e => console.error(e));
+
+    // Obtener ciclo activo para mostrar fechas de inicio y fin
+    fetch('http://localhost:4000/api/cycles/active')
+      .then(r => r.json())
+      .then(setActiveCycle)
+      .catch((e) => console.error('Error obteniendo ciclo activo', e));
   }, []);
 
   const toggleSelect = (type, id, name, price) => {
@@ -76,6 +83,19 @@ const StudentDashboard = () => {
 
   return (
     <Box sx={{ p: 3 }}>
+      {activeCycle && (
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle1">
+            Ciclo actual: {activeCycle.name}
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            {activeCycle.start_date ? new Date(activeCycle.start_date).toLocaleDateString() : '-'}
+            {' '}-
+            {' '}
+            {activeCycle.end_date ? new Date(activeCycle.end_date).toLocaleDateString() : '-'}
+          </Typography>
+        </Box>
+      )}
       <Typography variant="h5" sx={{ mb: 2 }}>Cursos disponibles</Typography>
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {courses.map(c => (
@@ -86,6 +106,16 @@ const StudentDashboard = () => {
                 <Typography variant="body2">{c.description}</Typography>
                 <Typography sx={{ mt: 1 }}>Profesor: {c.teacher_name || 'Sin asignar'}</Typography>
                 <Typography sx={{ mt: 1 }}>Precio: S/. {c.price}</Typography>
+                {activeCycle && (
+                  <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
+                    Ciclo: {activeCycle.name} (
+                    {activeCycle.start_date ? new Date(activeCycle.start_date).toLocaleDateString() : '-'}
+                    {' '}-
+                    {' '}
+                    {activeCycle.end_date ? new Date(activeCycle.end_date).toLocaleDateString() : '-'}
+                    )
+                  </Typography>
+                )}
               </CardContent>
               <CardActions>
                 <Button size="small" onClick={() => toggleSelect('course', c.id, c.name, c.price)}>
@@ -106,6 +136,16 @@ const StudentDashboard = () => {
                 <Typography variant="h6">{p.name}</Typography>
                 <Typography variant="body2">{p.description}</Typography>
                 <Typography sx={{ mt: 1 }}>Precio paquete: S/. {p.price_total}</Typography>
+                {activeCycle && (
+                  <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
+                    Ciclo: {activeCycle.name} (
+                    {activeCycle.start_date ? new Date(activeCycle.start_date).toLocaleDateString() : '-'}
+                    {' '}-
+                    {' '}
+                    {activeCycle.end_date ? new Date(activeCycle.end_date).toLocaleDateString() : '-'}
+                    )
+                  </Typography>
+                )}
               </CardContent>
               <CardActions>
                 <Button size="small" onClick={() => toggleSelect('package', p.id, p.name, p.price_total)}>
@@ -127,17 +167,75 @@ const StudentDashboard = () => {
       <Dialog open={openPay} onClose={() => setOpenPay(false)} fullWidth>
         <DialogTitle>Subir Voucher de Pago</DialogTitle>
         <DialogContent>
+          {activeCycle && (
+            <Box sx={{ mb: 1 }}>
+              <Typography variant="body2" color="textSecondary">
+                Ciclo: {activeCycle.name} (
+                {activeCycle.start_date ? new Date(activeCycle.start_date).toLocaleDateString() : '-'}
+                {' '}-
+                {' '}
+                {activeCycle.end_date ? new Date(activeCycle.end_date).toLocaleDateString() : '-'}
+                )
+              </Typography>
+            </Box>
+          )}
           <Typography>Adjunta el voucher para cada pago generado.</Typography>
           <Box sx={{ mt: 2 }}>
             <input type="file" onChange={(e) => setVoucherFile(e.target.files[0])} />
           </Box>
           <Box sx={{ mt: 2 }}>
-            {payments.map(p => (
-              <Box key={p.enrollmentId} sx={{ mb: 1 }}>
-                <Typography>{p.type} - id: {p.target_id} - Monto: S/. {p.amount}</Typography>
-                <Button variant="outlined" onClick={() => handleUpload(p.enrollmentId)} sx={{ mt: 1 }}>Subir voucher</Button>
-              </Box>
-            ))}
+            {/* Mostrar pagos de paquetes con descripción de cursos, y pagos individuales reales */}
+            {payments
+              .filter(p => {
+                // Mantener siempre las entradas de paquetes
+                if (p.type === 'package') return true;
+                // Para cursos sueltos (no provenientes de paquete), solo considerar si tienen monto > 0
+                const amount = Number(p.amount || 0);
+                return p.type === 'course' && amount > 0;
+              })
+              .map(p => (
+                <Box key={p.enrollmentId} sx={{ mb: 2, p: 1, border: '1px solid #ddd', borderRadius: 1 }}>
+                  {p.type === 'package' ? (
+                    <>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                        Pago de paquete
+                      </Typography>
+                      <Typography variant="body2" sx={{ mt: 0.5 }}>
+                        Monto total: S/. {Number(p.amount || 0).toFixed(2)}
+                      </Typography>
+                      {Array.isArray(p.courses) && p.courses.length > 0 && (
+                        <Box sx={{ mt: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                            Cursos incluidos:
+                          </Typography>
+                          {p.courses.map((c, idx) => (
+                            <Typography key={idx} variant="body2">
+                              - {c.name}
+                              {c.group ? ` (Grupo ${c.group})` : ''}
+                            </Typography>
+                          ))}
+                        </Box>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                        Pago de curso
+                      </Typography>
+                      <Typography variant="body2" sx={{ mt: 0.5 }}>
+                        Monto: S/. {Number(p.amount || 0).toFixed(2)}
+                      </Typography>
+                    </>
+                  )}
+                  <Button
+                    variant="outlined"
+                    onClick={() => handleUpload(p.enrollmentId)}
+                    sx={{ mt: 1 }}
+                  >
+                    Subir voucher
+                  </Button>
+                </Box>
+              ))}
           </Box>
         </DialogContent>
         <DialogActions>

@@ -104,6 +104,38 @@ exports.create = async (req, res) => {
   }
 };
 
+// Cancelar una matrícula propia (solo estudiante)
+// body: { enrollment_id }
+exports.cancelOwn = async (req, res) => {
+  try {
+    const studentId = req.user && req.user.id;
+    if (!studentId) return res.status(401).json({ message: 'No autenticado' });
+
+    const { enrollment_id } = req.body;
+    if (!enrollment_id) {
+      return res.status(400).json({ message: 'Falta enrollment_id' });
+    }
+
+    try {
+      const result = await Enrollment.cancelForStudent(studentId, enrollment_id);
+      return res.json(result);
+    } catch (err) {
+      const msg = err && err.message ? err.message : '';
+      if (
+        msg === 'Matrícula no encontrada' ||
+        msg === 'Solo se pueden cancelar matrículas pendientes' ||
+        msg === 'No se puede cancelar una matrícula con pagos o vouchers registrados'
+      ) {
+        return res.status(400).json({ message: msg });
+      }
+      throw err;
+    }
+  } catch (err) {
+    console.error('Error al cancelar matrícula:', err);
+    res.status(500).json({ message: 'Error al cancelar matrícula' });
+  }
+};
+
 // Obtener todas las matrículas (solo admin) con info de estudiante y pago
 exports.getAllAdmin = async (req, res) => {
   try {

@@ -131,7 +131,18 @@ const StudentMyEnrollments = () => {
       )}
 
       <Grid container spacing={3}>
-        {enrollments.map((enrollment) => (
+        {enrollments
+          // Ocultar cursos que pertenecen a un paquete y matrículas canceladas; dejar solo la matrícula del paquete
+          .filter((enrollment) => {
+            if (enrollment.status === 'cancelado') {
+              return false;
+            }
+            if (enrollment.enrollment_type === 'course' && enrollment.package_offering_id) {
+              return false;
+            }
+            return true;
+          })
+          .map((enrollment) => (
           <Grid item xs={12} md={6} key={enrollment.id}>
             <Card>
               <CardContent>
@@ -151,9 +162,51 @@ const StudentMyEnrollments = () => {
                     Ciclo: {enrollment.cycle_name}
                   </Typography>
                 )}
+                {(enrollment.cycle_start_date || enrollment.cycle_end_date) && (
+                  <Typography variant="body2" color="textSecondary" gutterBottom>
+                    {enrollment.cycle_start_date
+                      ? new Date(enrollment.cycle_start_date).toLocaleDateString()
+                      : '-'}{' '}
+                    -{' '}
+                    {enrollment.cycle_end_date
+                      ? new Date(enrollment.cycle_end_date).toLocaleDateString()
+                      : '-'}
+                  </Typography>
+                )}
+                {/* Para matrículas de paquete, mostrar descripción de cursos incluidos */}
+                {enrollment.enrollment_type === 'package' && enrollment.package_courses_summary && (
+                  <Typography variant="body2" color="textSecondary" gutterBottom>
+                    Cursos incluidos: {enrollment.package_courses_summary}
+                  </Typography>
+                )}
                 <Typography variant="h6" color="primary" sx={{ mt: 2 }}>
                   S/. {parseFloat(enrollment.item_price || 0).toFixed(2)}
                 </Typography>
+
+                {enrollment.status === 'pendiente' && (!enrollment.installments ||
+                  enrollment.installments.every((inst) => inst.status !== 'paid' && !inst.voucher_url)) && (
+                  <Box sx={{ mt: 1 }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="error"
+                      onClick={async () => {
+                        if (!window.confirm('¿Seguro que deseas cancelar esta matrícula?')) return;
+                        try {
+                          setError('');
+                          setSuccess('');
+                          await enrollmentsAPI.cancel(enrollment.id);
+                          setSuccess('Matrícula cancelada correctamente');
+                          loadEnrollments();
+                        } catch (err) {
+                          setError(err.message || 'Error al cancelar matrícula');
+                        }
+                      }}
+                    >
+                      Cancelar matrícula
+                    </Button>
+                  </Box>
+                )}
 
                 {/* Cuotas */}
                 {enrollment.installments && enrollment.installments.length > 0 && (
@@ -253,19 +306,45 @@ const StudentMyEnrollments = () => {
         <DialogTitle>Subir Voucher de Pago</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-            {selectedEnrollment && (
-              <>
-                <Typography variant="body2">
-                  Cuota #{selectedEnrollment.installment_number} - S/. {parseFloat(selectedEnrollment.amount || 0).toFixed(2)}
-                </Typography>
-                <TextField
-                  type="file"
-                  inputProps={{ accept: 'image/*,.pdf' }}
-                  onChange={(e) => setVoucherFile(e.target.files[0])}
-                  fullWidth
-                />
-              </>
-            )}
+            {selectedEnrollment && (() => {
+              const parentEnrollment = enrollments.find((enr) =>
+                Array.isArray(enr.installments) && enr.installments.some((inst) => inst.id === selectedEnrollment.id)
+              );
+
+              return (
+                <>
+                  {parentEnrollment && (
+                    <>
+                      {parentEnrollment.cycle_name && (
+                        <Typography variant="body2" color="textSecondary">
+                          Ciclo: {parentEnrollment.cycle_name}
+                        </Typography>
+                      )}
+                      {(parentEnrollment.cycle_start_date || parentEnrollment.cycle_end_date) && (
+                        <Typography variant="body2" color="textSecondary">
+                          {parentEnrollment.cycle_start_date
+                            ? new Date(parentEnrollment.cycle_start_date).toLocaleDateString()
+                            : '-'}{' '}
+                          -{' '}
+                          {parentEnrollment.cycle_end_date
+                            ? new Date(parentEnrollment.cycle_end_date).toLocaleDateString()
+                            : '-'}
+                        </Typography>
+                      )}
+                    </>
+                  )}
+                  <Typography variant="body2">
+                    Cuota #{selectedEnrollment.installment_number} - S/. {parseFloat(selectedEnrollment.amount || 0).toFixed(2)}
+                  </Typography>
+                  <TextField
+                    type="file"
+                    inputProps={{ accept: 'image/*,.pdf' }}
+                    onChange={(e) => setVoucherFile(e.target.files[0])}
+                    fullWidth
+                  />
+                </>
+              );
+            })()}
           </Box>
         </DialogContent>
         <DialogActions>

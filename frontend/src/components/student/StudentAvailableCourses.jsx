@@ -66,13 +66,25 @@ const StudentAvailableCourses = () => {
     return course.offerings;
   };
 
-  const toggleSelection = (type, offeringId, name, price) => {
+  const toggleSelection = (type, offeringId, name, price, cycleName, cycleStartDate, cycleEndDate) => {
     const key = `${type}-${offeringId}`;
     const exists = selectedItems.find(item => item.key === key);
     if (exists) {
       setSelectedItems(selectedItems.filter(item => item.key !== key));
     } else {
-      setSelectedItems([...selectedItems, { key, type, id: offeringId, name, price }]);
+      setSelectedItems([
+        ...selectedItems,
+        {
+          key,
+          type,
+          id: offeringId,
+          name,
+          price,
+          cycle_name: cycleName,
+          cycle_start_date: cycleStartDate,
+          cycle_end_date: cycleEndDate,
+        },
+      ]);
     }
   };
 
@@ -234,7 +246,17 @@ const StudentAvailableCourses = () => {
                     <Button
                       size="small"
                       variant={isSelected ? 'outlined' : 'contained'}
-                      onClick={() => toggleSelection('course', offering.id, course.name, price)}
+                      onClick={() =>
+                        toggleSelection(
+                          'course',
+                          offering.id,
+                          course.name,
+                          price,
+                          offering.cycle_name,
+                          offering.cycle_start_date,
+                          offering.cycle_end_date,
+                        )
+                      }
                     >
                       {isSelected ? 'Quitar' : 'Seleccionar'}
                     </Button>
@@ -302,7 +324,17 @@ const StudentAvailableCourses = () => {
                     <Button
                       size="small"
                       variant={isSelected ? 'outlined' : 'contained'}
-                      onClick={() => toggleSelection('package', offering.id, pkg.name, price)}
+                      onClick={() =>
+                        toggleSelection(
+                          'package',
+                          offering.id,
+                          pkg.name,
+                          price,
+                          offering.cycle_name,
+                          offering.cycle_start_date,
+                          offering.cycle_end_date,
+                        )
+                      }
                     >
                       {isSelected ? 'Quitar' : 'Seleccionar'}
                     </Button>
@@ -373,6 +405,23 @@ const StudentAvailableCourses = () => {
               <Box key={`sched-${item.key}`} sx={{ mt: 1 }}>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
                   {item.name}
+                </Typography>
+                <Typography variant="caption" color="textSecondary" display="block">
+                  {item.cycle_name || 'Ciclo no especificado'}
+                  {(item.cycle_start_date || item.cycle_end_date) && (
+                    <>
+                      {' '}
+                      ·{' '}
+                      {item.cycle_start_date
+                        ? new Date(item.cycle_start_date).toLocaleDateString()
+                        : '-'}
+                      {' '}
+                      -{' '}
+                      {item.cycle_end_date
+                        ? new Date(item.cycle_end_date).toLocaleDateString()
+                        : '-'}
+                    </>
+                  )}
                 </Typography>
                 {list.length === 0 ? (
                   <Typography variant="caption" color="textSecondary">Sin horarios registrados</Typography>

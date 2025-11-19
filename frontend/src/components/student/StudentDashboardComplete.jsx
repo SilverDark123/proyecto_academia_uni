@@ -52,10 +52,21 @@ const StudentDashboardComplete = () => {
     );
   }
 
+  // Ocultar matrículas canceladas y cursos que pertenecen a un paquete
+  const visibleEnrollments = enrollments.filter((e) => {
+    if (e.status === 'cancelado') {
+      return false;
+    }
+    if (e.enrollment_type === 'course' && e.package_offering_id) {
+      return false;
+    }
+    return true;
+  });
+
   const stats = {
-    totalEnrollments: enrollments.length,
-    acceptedEnrollments: enrollments.filter(e => e.status === 'aceptado').length,
-    pendingEnrollments: enrollments.filter(e => e.status === 'pendiente').length,
+    totalEnrollments: visibleEnrollments.length,
+    acceptedEnrollments: visibleEnrollments.filter(e => e.status === 'aceptado').length,
+    pendingEnrollments: visibleEnrollments.filter(e => e.status === 'pendiente').length,
   };
 
   return (
@@ -161,30 +172,47 @@ const StudentDashboardComplete = () => {
       </Grid>
 
       {/* Matrículas recientes */}
-      {enrollments.length > 0 && (
+      {visibleEnrollments.length > 0 && (
         <Box>
           <Typography variant="h5" gutterBottom>
             Mis Matrículas Recientes
           </Typography>
           <Grid container spacing={2}>
-            {enrollments.slice(0, 3).map((enrollment) => (
-              <Grid item xs={12} md={4} key={enrollment.id}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6">{enrollment.item_name || 'Curso/Paquete'}</Typography>
-                    <Chip
-                      label={enrollment.status}
-                      color={enrollment.status === 'aceptado' ? 'success' : 'warning'}
-                      size="small"
-                      sx={{ mt: 1 }}
-                    />
-                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                      S/. {parseFloat(enrollment.item_price || 0).toFixed(2)}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
+            {visibleEnrollments
+              .map((enrollment) => (
+                <Grid item xs={12} md={4} key={enrollment.id}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6">{enrollment.item_name || 'Curso/Paquete'}</Typography>
+                      <Chip
+                        label={enrollment.status}
+                        color={enrollment.status === 'aceptado' ? 'success' : 'warning'}
+                        size="small"
+                        sx={{ mt: 1 }}
+                      />
+                      {enrollment.cycle_name && (
+                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                          Ciclo: {enrollment.cycle_name}
+                        </Typography>
+                      )}
+                      {(enrollment.cycle_start_date || enrollment.cycle_end_date) && (
+                        <Typography variant="body2" color="textSecondary">
+                          {enrollment.cycle_start_date
+                            ? new Date(enrollment.cycle_start_date).toLocaleDateString()
+                            : '-'}{' '}
+                          -{' '}
+                          {enrollment.cycle_end_date
+                            ? new Date(enrollment.cycle_end_date).toLocaleDateString()
+                            : '-'}
+                        </Typography>
+                      )}
+                      <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                        S/. {parseFloat(enrollment.item_price || 0).toFixed(2)}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
           </Grid>
         </Box>
       )}
