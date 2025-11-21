@@ -19,7 +19,7 @@ Hola que tal a todos, los pasos para ejecutar el sistema son los siguientes
     DB_NAME=academia_final
     PORT=4000
 
-    2. db.js con lo siguiente:
+    2. crear el archivo db.js tambien en la carpeta raiz con lo siguiente:
     // db.js
     const mysql = require('mysql2/promise');
 
