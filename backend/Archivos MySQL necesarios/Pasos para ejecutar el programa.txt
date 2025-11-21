@@ -68,4 +68,5 @@ Hola que tal a todos, los pasos para ejecutar el sistema son los siguientes
 
 11. La pagina por el momento aun esta con un estilo simple, se modificara en el futuro
 
-12. Finalmente disfruta. Saludos :)
+12. Finalmente disfruta tu sistema, en lo personal casi todo lo hizo windsurf, instalarlo y vincular su cuenta 
+de github y tendran acceso a agentes durante 2 semanas completas tales como claude, gpt, deepseek, etc. Saludos :)
