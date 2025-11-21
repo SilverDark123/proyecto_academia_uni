@@ -207,6 +207,7 @@ CREATE TABLE analytics_summary (
   FOREIGN KEY (student_id) REFERENCES students(id),
   FOREIGN KEY (cycle_id) REFERENCES cycles(id)
 );
+ALTER TABLE installments ADD COLUMN rejection_reason VARCHAR(255) NULL AFTER voucher_url;
 
 -- ===========================================================
 -- ÍNDICES CLAVE
@@ -218,4 +219,19 @@ CREATE INDEX idx_installment_due ON installments(due_date);
 CREATE INDEX idx_attendance_student_date ON attendance(student_id, date);
 
 
-ALTER TABLE installments ADD COLUMN rejection_reason VARCHAR(255) NULL AFTER voucher_url;
+
+CREATE TABLE package_offering_courses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  package_offering_id INT NOT NULL,
+  course_offering_id INT NOT NULL,
+  UNIQUE KEY uq_poc (package_offering_id, course_offering_id),
+  FOREIGN KEY (package_offering_id) REFERENCES package_offerings(id) ON DELETE CASCADE,
+  FOREIGN KEY (course_offering_id) REFERENCES course_offerings(id) ON DELETE CASCADE
+);
+
+
+ALTER TABLE package_offering_courses
+ADD UNIQUE KEY uq_poc (package_offering_id, course_offering_id);
+ALTER TABLE package_offering_courses
+ADD KEY idx_poc_package_offering (package_offering_id),
+ADD KEY idx_poc_course_offering (course_offering_id);

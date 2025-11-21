@@ -1,0 +1,71 @@
+Hola que tal a todos, los pasos para ejecutar el sistema son los siguientes
+1. Tener MySQL y Node js instalados (Tener la contraseña de tu MySQL si no usar XAMMP o algo asi creo se llama xD)
+2. Ejeutar en un entorno MySQL los archivos adjuntos a este archivo:
+    . Base de datos a usar
+    Admin view - FIXED
+    Scheduller
+    Triggers
+3. Una vez ejecutado los scripts de MySQL dirijirse a la carpeta backend y ejecutar
+  cd backend
+  npm init -y
+  npm install
+  Instalara las dependencias
+4. Una vez ejecutado en la raiz de la carpeta crear los siguientes archivos:
+    1. .env con lo siguiente:
+    JWT_SECRET=tu_clave_secreta_muy_segura_123
+    DB_HOST=localhost
+    DB_USER=root
+    DB_PASSWORD=TuContraMySQL
+    DB_NAME=academia_final
+    PORT=4000
+
+    2. db.js con lo siguiente:
+    // db.js
+    const mysql = require('mysql2/promise');
+
+    const connection = mysql.createPool({
+      host: 'localhost',
+      user: 'root',
+      password: 'contraseña de tu BD',
+      database: 'academia_final',
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0
+    });
+
+    // Verificar la conexión
+    connection.getConnection()
+        .then(conn => {
+            console.log('Connected to the MySQL database.');
+            conn.release();
+        })
+        .catch(err => {
+            console.error('Error connecting to the database:', err);
+        });
+
+    module.exports = connection;
+
+3. Crear la carpeta uploads en la raiz de la carpeta backend esto para la subida de imgenes
+
+4. Si tienes fe al momento de ejecutar node server.js te correra
+
+5. Si no ejecutar los scripts de la carpeta test que fueron generadas por Cursor (recomendable descargar ese idle)
+
+6. Ir a la carpeta scrips y ejecutar el archivo createAdmin.js
+        cd scripts
+        node createAdmin.js
+        Creara al administrador con usuario: admin y contraseña: admin123
+
+7. El administrador ya puede crear cursos, docentes, ciclos, grupos, etc.
+
+8. Ya se puede registrar, loguear, seleccionar cursos o paquete de cursos, pagar
+      (Por el momento solo se puede subir un voucher, 
+      al momento de matricular te sale a que cuenta pagar, modificar si el cliente lo quiere)
+
+9. Leer Flujo detallado base de datos.txt si no lo entienden yo tampoco lo entendo xDxDxdXDxDXdx
+
+10. Dirijirse a la carpeta frontend y ejecutar npm install y correrlo con npm run dev
+
+11. La pagina por el momento aun esta con un estilo simple, se modificara en el futuro
+
+12. Finalmente disfruta. Saludos :)
