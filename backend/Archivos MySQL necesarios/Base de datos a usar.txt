@@ -229,9 +229,6 @@ CREATE TABLE package_offering_courses (
   FOREIGN KEY (course_offering_id) REFERENCES course_offerings(id) ON DELETE CASCADE
 );
 
-
-ALTER TABLE package_offering_courses
-ADD UNIQUE KEY uq_poc (package_offering_id, course_offering_id);
 ALTER TABLE package_offering_courses
 ADD KEY idx_poc_package_offering (package_offering_id),
 ADD KEY idx_poc_course_offering (course_offering_id);
