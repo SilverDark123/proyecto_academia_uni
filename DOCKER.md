@@ -25,6 +25,11 @@
 
 ```bash
 docker-compose exec backend npm run create:test-users
+docker-compose exec backend npm run test
+docker-compose exec backend npm run test:flujo
+docker-compose exec backend npm run test:setup
+docker-compose exec backend npm run test:dashboard
+docker-compose exec backend npm run fix:dashboard
 ```
 
 ** Verify other commands: **

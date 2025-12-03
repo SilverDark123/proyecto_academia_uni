@@ -1,29 +1,30 @@
 // controllers/enrollmentController.js
-const Enrollment = require('../models/enrollmentModel');
-const db = require('../db');
+const Enrollment = require("../models/enrollmentModel");
+const db = require("../db");
 
 // Obtener las matrículas del estudiante autenticado
 exports.getAll = async (req, res) => {
   try {
     let studentId;
-    
+
     // Si es estudiante, usar su ID del token
-    if (req.user.role === 'student') {
+    if (req.user.role === "student") {
       studentId = req.user.id;
-    } 
+    }
     // Si es admin, puede especificar student_id en query
-    else if (req.user.role === 'admin' && req.query.student_id) {
+    else if (req.user.role === "admin" && req.query.student_id) {
       studentId = req.query.student_id;
-    } 
-    else {
-      return res.status(400).json({ message: 'Falta student_id o no tienes permisos' });
+    } else {
+      return res
+        .status(400)
+        .json({ message: "Falta student_id o no tienes permisos" });
     }
 
     const enrollments = await Enrollment.getByStudent(studentId);
     res.json(enrollments);
   } catch (err) {
-    console.error('Error al obtener las matrículas:', err);
-    res.status(500).json({ message: 'Error al obtener las matrículas' });
+    console.error("Error al obtener las matrículas:", err);
+    res.status(500).json({ message: "Error al obtener las matrículas" });
   }
 };
 
@@ -31,22 +32,22 @@ exports.getAll = async (req, res) => {
 // Query: type=course|package, id=<offering_id>, status=aceptado|pendiente|...
 exports.getByOffering = async (req, res) => {
   try {
-    const { type, id, status = 'aceptado' } = req.query;
+    const { type, id, status = "aceptado" } = req.query;
     if (!type || !id) {
-      return res.status(400).json({ message: 'Faltan parámetros: type e id' });
+      return res.status(400).json({ message: "Faltan parámetros: type e id" });
     }
 
-    let where = 'e.enrollment_type = ? AND e.status = ?';
-    const params = [type === 'course' ? 'course' : 'package', status];
+    let where = "e.enrollment_type = $1 AND e.status = $2";
+    const params = [type === "course" ? "course" : "package", status];
 
-    if (type === 'course') {
-      where += ' AND e.course_offering_id = ?';
+    if (type === "course") {
+      where += " AND e.course_offering_id = $3";
     } else {
-      where += ' AND e.package_offering_id = ?';
+      where += " AND e.package_offering_id = $3";
     }
     params.push(id);
 
-    const [rows] = await db.query(
+    const result = await db.query(
       `SELECT 
           MIN(e.id) as enrollment_id,
           e.enrollment_type,
@@ -65,10 +66,12 @@ exports.getByOffering = async (req, res) => {
       params
     );
 
-    res.json(rows);
+    res.json(result.rows);
   } catch (err) {
-    console.error('Error al obtener matriculados por oferta:', err);
-    res.status(500).json({ message: 'Error al obtener matriculados por oferta' });
+    console.error("Error al obtener matriculados por oferta:", err);
+    res
+      .status(500)
+      .json({ message: "Error al obtener matriculados por oferta" });
   }
 };
 
@@ -77,30 +80,34 @@ exports.getByOffering = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const studentId = req.user && req.user.id;
-    if (!studentId) return res.status(401).json({ message: 'No autenticado' });
+    if (!studentId) return res.status(401).json({ message: "No autenticado" });
 
     const { items } = req.body;
     if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ message: 'No se enviaron items para matricular' });
+      return res
+        .status(400)
+        .json({ message: "No se enviaron items para matricular" });
     }
 
     const created = await Enrollment.createForStudent(studentId, items);
-    res.status(201).json({ message: 'Matrículas creadas correctamente', created });
+    res
+      .status(201)
+      .json({ message: "Matrículas creadas correctamente", created });
   } catch (err) {
-    console.error('Error al crear matrículas:', err);
+    console.error("Error al crear matrículas:", err);
     // Conflictos de reglas de negocio -> 400
     const knownMsgs = [
-      'El estudiante ya está matriculado en este curso',
-      'El estudiante ya está matriculado en este paquete',
-      'Ya existe una matrícula de paquete que cubre este curso',
-      'El estudiante ya está matriculado en cursos que pertenecen a este paquete',
-      'Course offering no encontrado',
-      'Package offering no encontrado'
+      "El estudiante ya está matriculado en este curso",
+      "El estudiante ya está matriculado en este paquete",
+      "Ya existe una matrícula de paquete que cubre este curso",
+      "El estudiante ya está matriculado en cursos que pertenecen a este paquete",
+      "Course offering no encontrado",
+      "Package offering no encontrado",
     ];
     if (err && err.message && knownMsgs.includes(err.message)) {
       return res.status(400).json({ message: err.message });
     }
-    res.status(500).json({ message: 'Error al crear la matrícula' });
+    res.status(500).json({ message: "Error al crear la matrícula" });
   }
 };
 
@@ -109,37 +116,41 @@ exports.create = async (req, res) => {
 exports.cancelOwn = async (req, res) => {
   try {
     const studentId = req.user && req.user.id;
-    if (!studentId) return res.status(401).json({ message: 'No autenticado' });
+    if (!studentId) return res.status(401).json({ message: "No autenticado" });
 
     const { enrollment_id } = req.body;
     if (!enrollment_id) {
-      return res.status(400).json({ message: 'Falta enrollment_id' });
+      return res.status(400).json({ message: "Falta enrollment_id" });
     }
 
     try {
-      const result = await Enrollment.cancelForStudent(studentId, enrollment_id);
+      const result = await Enrollment.cancelForStudent(
+        studentId,
+        enrollment_id
+      );
       return res.json(result);
     } catch (err) {
-      const msg = err && err.message ? err.message : '';
+      const msg = err && err.message ? err.message : "";
       if (
-        msg === 'Matrícula no encontrada' ||
-        msg === 'Solo se pueden cancelar matrículas pendientes' ||
-        msg === 'No se puede cancelar una matrícula con pagos o vouchers registrados'
+        msg === "Matrícula no encontrada" ||
+        msg === "Solo se pueden cancelar matrículas pendientes" ||
+        msg ===
+          "No se puede cancelar una matrícula con pagos o vouchers registrados"
       ) {
         return res.status(400).json({ message: msg });
       }
       throw err;
     }
   } catch (err) {
-    console.error('Error al cancelar matrícula:', err);
-    res.status(500).json({ message: 'Error al cancelar matrícula' });
+    console.error("Error al cancelar matrícula:", err);
+    res.status(500).json({ message: "Error al cancelar matrícula" });
   }
 };
 
 // Obtener todas las matrículas (solo admin) con info de estudiante y pago
 exports.getAllAdmin = async (req, res) => {
   try {
-    const [rows] = await db.query(`
+    const result = await db.query(`
       SELECT e.*, s.first_name, s.last_name, s.dni,
         COALESCE(c.name, p.name) as item_name,
         pp.id as payment_plan_id, ip.id as installment_id, ip.amount as installment_amount, ip.status as installment_status, ip.voucher_url
@@ -154,10 +165,10 @@ exports.getAllAdmin = async (req, res) => {
       ORDER BY e.id DESC
     `);
 
-    res.json(rows);
+    res.json(result.rows);
   } catch (err) {
-    console.error('Error obteniendo matrículas admin:', err);
-    res.status(500).json({ message: 'Error al obtener matrículas' });
+    console.error("Error obteniendo matrículas admin:", err);
+    res.status(500).json({ message: "Error al obtener matrículas" });
   }
 };
 
@@ -165,43 +176,53 @@ exports.getAllAdmin = async (req, res) => {
 exports.updateStatus = async (req, res) => {
   try {
     const { enrollment_id, status } = req.body;
-    
-    if (!['aceptado', 'rechazado', 'cancelado'].includes(status)) {
-      return res.status(400).json({ message: 'Status inválido' });
+
+    if (!["aceptado", "rechazado", "cancelado"].includes(status)) {
+      return res.status(400).json({ message: "Status inválido" });
     }
 
     const adminId = req.user.id;
-    const accepted_at = status === 'aceptado' ? new Date() : null;
+    const accepted_at = status === "aceptado" ? new Date() : null;
 
     // Regla: Solo aceptar si el pago está 100% aprobado (todas las cuotas pagadas)
-    if (status === 'aceptado') {
-      const [ppRows] = await db.query(
-        'SELECT pp.id FROM payment_plans pp WHERE pp.enrollment_id = ? LIMIT 1',
+    if (status === "aceptado") {
+      const ppResult = await db.query(
+        "SELECT pp.id FROM payment_plans pp WHERE pp.enrollment_id = $1 LIMIT 1",
         [enrollment_id]
       );
+      const ppRows = ppResult.rows;
       if (ppRows.length) {
         const paymentPlanId = ppRows[0].id;
-        const [pending] = await db.query(
-          'SELECT COUNT(*) as cnt FROM installments WHERE payment_plan_id = ? AND status != ?',
-          [paymentPlanId, 'paid']
+        const pendingResult = await db.query(
+          "SELECT COUNT(*) as cnt FROM installments WHERE payment_plan_id = $1 AND status != $2",
+          [paymentPlanId, "paid"]
         );
+        const pending = pendingResult.rows;
         if (pending[0].cnt > 0) {
-          return res.status(400).json({ message: 'No se puede aceptar: pago no aprobado completamente' });
+          return res
+            .status(400)
+            .json({
+              message: "No se puede aceptar: pago no aprobado completamente",
+            });
         }
       } else {
         // Si no hay plan de pagos, no permitir aceptación automática
-        return res.status(400).json({ message: 'No se puede aceptar: matrícula sin plan de pago' });
+        return res
+          .status(400)
+          .json({ message: "No se puede aceptar: matrícula sin plan de pago" });
       }
     }
 
     await db.query(
-      'UPDATE enrollments SET status = ?, accepted_by_admin_id = ?, accepted_at = ? WHERE id = ?',
+      "UPDATE enrollments SET status = $1, accepted_by_admin_id = $2, accepted_at = $3 WHERE id = $4",
       [status, adminId, accepted_at, enrollment_id]
     );
 
     res.json({ message: `Matrícula ${status} correctamente` });
   } catch (err) {
-    console.error('Error actualizando estado de matrícula:', err);
-    res.status(500).json({ message: 'Error al actualizar estado de matrícula' });
+    console.error("Error actualizando estado de matrícula:", err);
+    res
+      .status(500)
+      .json({ message: "Error al actualizar estado de matrícula" });
   }
 };

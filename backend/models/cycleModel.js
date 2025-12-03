@@ -1,7 +1,7 @@
 // models/cycleModel.js
-const db = require('../db');
+const db = require("../db");
 
-function formatDateForMySQL(value) {
+function formatDateForPostgreSQL(value) {
   if (!value) return null;
   const d = new Date(value);
   if (isNaN(d)) return null;
@@ -13,57 +13,58 @@ const Cycle = {
     const { name, start_date, end_date, duration_months, status } = data;
     const sql = `
       INSERT INTO cycles (name, start_date, end_date, duration_months, status)
-      VALUES (?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id
     `;
-    const [result] = await db.query(sql, [
+    const result = await db.query(sql, [
       name,
-      formatDateForMySQL(start_date),
-      formatDateForMySQL(end_date),
+      formatDateForPostgreSQL(start_date),
+      formatDateForPostgreSQL(end_date),
       duration_months || null,
-      status || 'open'
+      status || "open",
     ]);
-    return { id: result.insertId };
+    return { id: result.rows[0].id };
   },
 
   async getAll() {
-    const [rows] = await db.query('SELECT * FROM cycles ORDER BY id DESC');
-    return rows;
+    const result = await db.query("SELECT * FROM cycles ORDER BY id DESC");
+    return result.rows;
   },
 
   async getOne(id) {
-    const [rows] = await db.query('SELECT * FROM cycles WHERE id = ?', [id]);
-    return rows[0];
+    const result = await db.query("SELECT * FROM cycles WHERE id = $1", [id]);
+    return result.rows[0];
   },
 
   async update(id, data) {
     const { name, start_date, end_date, duration_months, status } = data;
     const sql = `
       UPDATE cycles 
-      SET name = ?, start_date = ?, end_date = ?, duration_months = ?, status = ?
-      WHERE id = ?
+      SET name = $1, start_date = $2, end_date = $3, duration_months = $4, status = $5
+      WHERE id = $6
     `;
     await db.query(sql, [
       name,
-      formatDateForMySQL(start_date),
-      formatDateForMySQL(end_date),
+      formatDateForPostgreSQL(start_date),
+      formatDateForPostgreSQL(end_date),
       duration_months || null,
-      status || 'open',
-      id
+      status || "open",
+      id,
     ]);
     return true;
   },
 
   async delete(id) {
-    await db.query('DELETE FROM cycles WHERE id = ?', [id]);
+    await db.query("DELETE FROM cycles WHERE id = $1", [id]);
     return true;
   },
 
   async getActive() {
-    const [rows] = await db.query(
+    const result = await db.query(
       "SELECT * FROM cycles WHERE status = 'open' OR status = 'in_progress' ORDER BY id DESC"
     );
-    return rows;
-  }
+    return result.rows;
+  },
 };
 
 module.exports = Cycle;

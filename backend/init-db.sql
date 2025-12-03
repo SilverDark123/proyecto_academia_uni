@@ -1,23 +1,34 @@
 -- ===========================================================
--- CREAR BASE DE DATOS
+-- POSTGRESQL SCHEMA FOR ACADEMIA
 -- ===========================================================
-CREATE DATABASE IF NOT EXISTS academia_final CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-USE academia_final;
+
+-- ===========================================================
+-- CREAR TIPOS ENUM
+-- ===========================================================
+CREATE TYPE user_role AS ENUM ('admin', 'student', 'teacher');
+CREATE TYPE cycle_status AS ENUM ('open', 'in_progress', 'closed');
+CREATE TYPE enrollment_type AS ENUM ('course', 'package');
+CREATE TYPE enrollment_status AS ENUM ('pendiente', 'aceptado', 'rechazado', 'cancelado');
+CREATE TYPE installment_status AS ENUM ('pending', 'paid', 'overdue');
+CREATE TYPE attendance_status AS ENUM ('presente', 'ausente');
+CREATE TYPE notification_type AS ENUM ('absences_3', 'payment_due', 'other');
+CREATE TYPE notification_status AS ENUM ('pending', 'sent', 'failed');
+CREATE TYPE day_of_week AS ENUM ('Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo');
 
 -- ===========================================================
 -- TABLAS DE USUARIOS Y DOCENTES
 -- ===========================================================
 CREATE TABLE users (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   username VARCHAR(50) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  role ENUM('admin','student','teacher') NOT NULL,
+  role user_role NOT NULL,
   related_id INT DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE teachers (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   first_name VARCHAR(50) NOT NULL,
   last_name VARCHAR(50) NOT NULL,
   dni VARCHAR(15) UNIQUE NOT NULL,
@@ -31,7 +42,7 @@ CREATE TABLE teachers (
 -- TABLA DE ESTUDIANTES
 -- ===========================================================
 CREATE TABLE students (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   dni VARCHAR(15) UNIQUE NOT NULL,
   first_name VARCHAR(50) NOT NULL,
   last_name VARCHAR(50) NOT NULL,
@@ -46,12 +57,12 @@ CREATE TABLE students (
 -- TABLA DE CICLOS
 -- ===========================================================
 CREATE TABLE cycles (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   start_date DATE NOT NULL,
   end_date DATE NOT NULL,
-  duration_months TINYINT,
-  status ENUM('open','in_progress','closed') DEFAULT 'open',
+  duration_months SMALLINT,
+  status cycle_status DEFAULT 'open',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -59,7 +70,7 @@ CREATE TABLE cycles (
 -- TABLAS DE CURSOS Y PAQUETES
 -- ===========================================================
 CREATE TABLE courses (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   description TEXT,
   base_price DECIMAL(10,2) DEFAULT 0.00,
@@ -67,7 +78,7 @@ CREATE TABLE courses (
 );
 
 CREATE TABLE packages (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   description TEXT,
   base_price DECIMAL(10,2) DEFAULT 0.00,
@@ -75,7 +86,7 @@ CREATE TABLE packages (
 );
 
 CREATE TABLE package_courses (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   package_id INT NOT NULL,
   course_id INT NOT NULL,
   FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE,
@@ -86,7 +97,7 @@ CREATE TABLE package_courses (
 -- CURSOS Y PAQUETES OFERTADOS POR CICLO
 -- ===========================================================
 CREATE TABLE course_offerings (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   course_id INT NOT NULL,
   cycle_id INT NOT NULL,
   group_label VARCHAR(50),
@@ -100,7 +111,7 @@ CREATE TABLE course_offerings (
 );
 
 CREATE TABLE package_offerings (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   package_id INT NOT NULL,
   cycle_id INT NOT NULL,
   group_label VARCHAR(50),
@@ -115,9 +126,9 @@ CREATE TABLE package_offerings (
 -- HORARIOS
 -- ===========================================================
 CREATE TABLE schedules (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   course_offering_id INT NOT NULL,
-  day_of_week ENUM('Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo') NOT NULL,
+  day_of_week day_of_week NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
   classroom VARCHAR(50),
@@ -128,12 +139,12 @@ CREATE TABLE schedules (
 -- MATRÍCULAS
 -- ===========================================================
 CREATE TABLE enrollments (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   student_id INT NOT NULL,
   course_offering_id INT DEFAULT NULL,
   package_offering_id INT DEFAULT NULL,
-  enrollment_type ENUM('course','package') NOT NULL,
-  status ENUM('pendiente','aceptado','rechazado','cancelado') DEFAULT 'pendiente',
+  enrollment_type enrollment_type NOT NULL,
+  status enrollment_status DEFAULT 'pendiente',
   registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   accepted_by_admin_id INT DEFAULT NULL,
   accepted_at TIMESTAMP NULL,
@@ -146,7 +157,7 @@ CREATE TABLE enrollments (
 -- PLANES DE PAGO Y CUOTAS
 -- ===========================================================
 CREATE TABLE payment_plans (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   enrollment_id INT NOT NULL,
   total_amount DECIMAL(10,2) NOT NULL,
   installments INT DEFAULT 1,
@@ -155,13 +166,13 @@ CREATE TABLE payment_plans (
 );
 
 CREATE TABLE installments (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   payment_plan_id INT NOT NULL,
-  installment_number TINYINT NOT NULL,
+  installment_number SMALLINT NOT NULL,
   amount DECIMAL(10,2) NOT NULL,
   due_date DATE NOT NULL,
-  paid_at DATETIME NULL,
-  status ENUM('pending','paid','overdue') DEFAULT 'pending',
+  paid_at TIMESTAMP NULL,
+  status installment_status DEFAULT 'pending',
   voucher_url TEXT,
   rejection_reason VARCHAR(255) NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -172,11 +183,11 @@ CREATE TABLE installments (
 -- ASISTENCIAS
 -- ===========================================================
 CREATE TABLE attendance (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   student_id INT NOT NULL,
   schedule_id INT NOT NULL,
   date DATE NOT NULL,
-  status ENUM('presente','ausente') NOT NULL,
+  status attendance_status NOT NULL,
   FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
   FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE
 );
@@ -185,13 +196,13 @@ CREATE TABLE attendance (
 -- NOTIFICACIONES
 -- ===========================================================
 CREATE TABLE notifications_log (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   student_id INT NOT NULL,
   parent_phone VARCHAR(20),
-  type ENUM('absences_3','payment_due','other') NOT NULL,
+  type notification_type NOT NULL,
   message TEXT NOT NULL,
   sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  status ENUM('pending','sent','failed') DEFAULT 'pending',
+  status notification_status DEFAULT 'pending',
   FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
 );
 
@@ -199,21 +210,21 @@ CREATE TABLE notifications_log (
 -- TABLA ANALÍTICA
 -- ===========================================================
 CREATE TABLE analytics_summary (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   student_id INT NOT NULL,
   cycle_id INT NOT NULL,
   attendance_pct DECIMAL(5,2) DEFAULT 0,
   total_paid DECIMAL(10,2) DEFAULT 0,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (student_id) REFERENCES students(id),
   FOREIGN KEY (cycle_id) REFERENCES cycles(id)
 );
 
 CREATE TABLE package_offering_courses (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id SERIAL PRIMARY KEY,
   package_offering_id INT NOT NULL,
   course_offering_id INT NOT NULL,
-  UNIQUE KEY uq_poc (package_offering_id, course_offering_id),
+  UNIQUE (package_offering_id, course_offering_id),
   FOREIGN KEY (package_offering_id) REFERENCES package_offerings(id) ON DELETE CASCADE,
   FOREIGN KEY (course_offering_id) REFERENCES course_offerings(id) ON DELETE CASCADE
 );
@@ -259,7 +270,7 @@ SELECT
     COALESCE(
       CASE 
         WHEN MAX(pp.total_amount) IS NOT NULL THEN 
-          MAX(pp.total_amount) - IFNULL(MAX(a.total_paid), 0)
+          MAX(pp.total_amount) - COALESCE(MAX(a.total_paid), 0)
         ELSE 0
       END, 0
     ), 2
@@ -287,20 +298,20 @@ SELECT
       FROM notifications_log nl2
       WHERE nl2.student_id = s.id
       AND nl2.type = 'payment_due'
-      AND DATE(nl2.sent_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+      AND DATE(nl2.sent_at) >= CURRENT_DATE - INTERVAL '7 days'
     ) THEN 'Deuda reciente notificada'
     WHEN EXISTS (
       SELECT 1
       FROM notifications_log nl3
       WHERE nl3.student_id = s.id
       AND nl3.type = 'absences_3'
-      AND DATE(nl3.sent_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+      AND DATE(nl3.sent_at) >= CURRENT_DATE - INTERVAL '7 days'
     ) THEN 'Faltas recientes notificadas'
     WHEN ROUND(
       COALESCE(
         CASE 
           WHEN MAX(pp.total_amount) IS NOT NULL THEN 
-            MAX(pp.total_amount) - IFNULL(MAX(a.total_paid), 0)
+            MAX(pp.total_amount) - COALESCE(MAX(a.total_paid), 0)
           ELSE 0
         END, 0
       ), 2
@@ -330,17 +341,30 @@ GROUP BY
 -- ===========================================================
 -- TRIGGERS
 -- ===========================================================
-DELIMITER //
 
-CREATE TRIGGER trg_update_attendance_summary
-AFTER INSERT ON attendance
-FOR EACH ROW
+-- Trigger para actualizar analytics_summary.updated_at
+CREATE OR REPLACE FUNCTION update_analytics_timestamp()
+RETURNS TRIGGER AS $$
 BEGIN
-  DECLARE total_classes INT;
-  DECLARE attended_classes INT;
-  DECLARE attendance_rate DECIMAL(5,2);
-  DECLARE v_cycle INT;
+  NEW.updated_at = CURRENT_TIMESTAMP;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
+CREATE TRIGGER trg_analytics_update_timestamp
+BEFORE UPDATE ON analytics_summary
+FOR EACH ROW
+EXECUTE FUNCTION update_analytics_timestamp();
+
+-- Trigger para actualizar attendance summary
+CREATE OR REPLACE FUNCTION update_attendance_summary()
+RETURNS TRIGGER AS $$
+DECLARE
+  total_classes INT;
+  attended_classes INT;
+  attendance_rate DECIMAL(5,2);
+  v_cycle INT;
+BEGIN
   SELECT co.cycle_id INTO v_cycle
   FROM schedules s
   JOIN course_offerings co ON co.id = s.course_offering_id
@@ -359,22 +383,30 @@ BEGIN
   JOIN course_offerings co3 ON co3.id = s3.course_offering_id
   WHERE a.student_id = NEW.student_id AND co3.cycle_id = v_cycle AND a.status = 'presente';
 
-  SET attendance_rate = (attended_classes / total_classes) * 100;
+  attendance_rate := (attended_classes::DECIMAL / total_classes::DECIMAL) * 100;
 
   INSERT INTO analytics_summary (student_id, cycle_id, attendance_pct, total_paid)
   VALUES (NEW.student_id, v_cycle, attendance_rate, 0)
-  ON DUPLICATE KEY UPDATE attendance_pct = attendance_rate, updated_at = NOW();
+  ON CONFLICT (student_id, cycle_id) 
+  DO UPDATE SET attendance_pct = attendance_rate, updated_at = CURRENT_TIMESTAMP;
+
+  RETURN NEW;
 END;
-//
+$$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_update_payment_summary
-AFTER UPDATE ON installments
+CREATE TRIGGER trg_update_attendance_summary
+AFTER INSERT ON attendance
 FOR EACH ROW
-BEGIN
-  DECLARE v_student INT;
-  DECLARE v_cycle INT;
-  DECLARE v_total DECIMAL(10,2);
+EXECUTE FUNCTION update_attendance_summary();
 
+-- Trigger para actualizar payment summary
+CREATE OR REPLACE FUNCTION update_payment_summary()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_student INT;
+  v_cycle INT;
+  v_total DECIMAL(10,2);
+BEGIN
   SELECT e.student_id, 
          COALESCE(co.cycle_id, po.cycle_id)
   INTO v_student, v_cycle
@@ -391,85 +423,17 @@ BEGIN
 
   INSERT INTO analytics_summary (student_id, cycle_id, attendance_pct, total_paid)
   VALUES (v_student, v_cycle, 0, v_total)
-  ON DUPLICATE KEY UPDATE total_paid = v_total, updated_at = NOW();
+  ON CONFLICT (student_id, cycle_id)
+  DO UPDATE SET total_paid = v_total, updated_at = CURRENT_TIMESTAMP;
+
+  RETURN NEW;
 END;
-//
+$$ LANGUAGE plpgsql;
 
-DELIMITER ;
+CREATE TRIGGER trg_update_payment_summary
+AFTER UPDATE ON installments
+FOR EACH ROW
+EXECUTE FUNCTION update_payment_summary();
 
--- ===========================================================
--- ACTIVAR PROGRAMADOR DE EVENTOS
--- ===========================================================
-SET GLOBAL event_scheduler = ON;
-
-DELIMITER //
-
-CREATE EVENT IF NOT EXISTS ev_notify_3_absences
-ON SCHEDULE EVERY 1 DAY
-STARTS TIMESTAMP(CURRENT_DATE, '08:00:00')
-DO
-BEGIN
-  INSERT INTO notifications_log (student_id, parent_phone, type, message, sent_at)
-  SELECT 
-      s.id AS student_id,
-      s.parent_phone,
-      'absences_3' AS type,
-      CONCAT('Estimado apoderado, su hijo(a) ', s.first_name, ' ', s.last_name,
-             ' ha acumulado 3 o más faltas en el ciclo actual.') AS message,
-      NOW()
-  FROM students s
-  JOIN attendance a ON a.student_id = s.id
-  JOIN schedules sc ON sc.id = a.schedule_id
-  JOIN course_offerings co ON co.id = sc.course_offering_id
-  JOIN cycles c ON c.id = co.cycle_id
-  WHERE a.status = 'ausente'
-    AND CURDATE() BETWEEN c.start_date AND c.end_date
-  GROUP BY s.id, c.id
-  HAVING COUNT(*) >= 3
-  AND s.id NOT IN (
-    SELECT nl.student_id
-    FROM notifications_log nl
-    WHERE nl.type = 'absences_3'
-      AND DATE(nl.sent_at) = CURDATE()
-  );
-END;
-//
-
-CREATE EVENT IF NOT EXISTS ev_notify_overdue_payments
-ON SCHEDULE EVERY 1 DAY
-STARTS TIMESTAMP(CURRENT_DATE, '09:00:00')
-DO
-BEGIN
-  INSERT INTO notifications_log (student_id, parent_phone, type, message, sent_at)
-  SELECT 
-      s.id AS student_id,
-      s.parent_phone,
-      'payment_due' AS type,
-      CONCAT('Estimado apoderado, usted tiene una cuota vencida de S/ ',
-             i.amount, ' correspondiente a la matrícula de su hijo(a) ',
-             s.first_name, ' ', s.last_name, '. Por favor regularice el pago.') AS message,
-      NOW()
-  FROM installments i
-  JOIN payment_plans pp ON pp.id = i.payment_plan_id
-  JOIN enrollments e ON e.id = pp.enrollment_id
-  JOIN students s ON s.id = e.student_id
-  WHERE i.status = 'pending' AND i.due_date < CURDATE()
-    AND s.id NOT IN (
-      SELECT nl.student_id
-      FROM notifications_log nl
-      WHERE nl.type = 'payment_due'
-        AND DATE(nl.sent_at) = CURDATE()
-    );
-END;
-//
-
-CREATE EVENT IF NOT EXISTS ev_cleanup_notifications
-ON SCHEDULE EVERY 1 MONTH
-DO
-BEGIN
-  DELETE FROM notifications_log
-  WHERE sent_at < DATE_SUB(CURDATE(), INTERVAL 6 MONTH);
-END;
-//
-
-DELIMITER ;
+-- Crear índice único para ON CONFLICT en analytics_summary
+CREATE UNIQUE INDEX idx_analytics_student_cycle ON analytics_summary(student_id, cycle_id);

@@ -1,16 +1,12 @@
 -- ===========================================================
--- SCRIPT PARA CORREGIR LA VISTA DEL DASHBOARD ADMIN
+-- SCRIPT PARA CORREGIR LA VISTA DEL DASHBOARD ADMIN (POSTGRESQL)
 -- ===========================================================
--- El problema: MySQL está en modo ONLY_FULL_GROUP_BY, que requiere
--- que todos los campos no agregados estén en el GROUP BY
-
-USE academia_final;
 
 -- Eliminar la vista existente
 DROP VIEW IF EXISTS view_dashboard_admin_extended;
 
 -- Crear la vista corregida
-CREATE VIEW view_dashboard_admin_extended AS
+CREATE OR REPLACE VIEW view_dashboard_admin_extended AS
 SELECT
   s.id AS student_id,
   CONCAT(s.first_name, ' ', s.last_name) AS student_name,
@@ -38,7 +34,7 @@ SELECT
     COALESCE(
       CASE 
         WHEN MAX(pp.total_amount) IS NOT NULL THEN 
-          MAX(pp.total_amount) - IFNULL(MAX(a.total_paid), 0)
+          MAX(pp.total_amount) - COALESCE(MAX(a.total_paid), 0)
         ELSE 0
       END, 0
     ), 2
@@ -70,25 +66,25 @@ SELECT
       FROM notifications_log nl2
       WHERE nl2.student_id = s.id
       AND nl2.type = 'payment_due'
-      AND DATE(nl2.sent_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+      AND DATE(nl2.sent_at) >= CURRENT_DATE - INTERVAL '7 days'
     ) THEN 'Deuda reciente notificada'
     WHEN EXISTS (
       SELECT 1
       FROM notifications_log nl3
       WHERE nl3.student_id = s.id
       AND nl3.type = 'absences_3'
-      AND DATE(nl3.sent_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+      AND DATE(nl3.sent_at) >= CURRENT_DATE - INTERVAL '7 days'
     ) THEN 'Faltas recientes notificadas'
     WHEN ROUND(
       COALESCE(
         CASE 
           WHEN MAX(pp.total_amount) IS NOT NULL THEN 
-            MAX(pp.total_amount) - IFNULL(MAX(a.total_paid), 0)
+            MAX(pp.total_amount) - COALESCE(MAX(a.total_paid), 0)
           ELSE 0
         END, 0
       ), 2
     ) > 0 THEN 'Con deuda pendiente'
-    WHEN MAX(a.attendance_pct) < 75 AND c.start_date <= CURDATE() THEN 'Baja asistencia'
+    WHEN MAX(a.attendance_pct) < 75 AND c.start_date <= CURRENT_DATE THEN 'Baja asistencia'
     ELSE 'En regla'
   END AS alert_status
 
@@ -109,4 +105,3 @@ GROUP BY
   e.id, e.enrollment_type, e.status,
   co.group_label, po.group_label,
   courses.name, packages.name;
-

@@ -1,16 +1,21 @@
 // controllers/adminController.js
-const db = require('../db');
+const db = require("../db");
 
 // Obtener dashboard admin usando la vista extendida
 exports.getDashboard = async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM view_dashboard_admin_extended ORDER BY student_id DESC');
-    res.json(rows);
+    const result = await db.query(
+      "SELECT * FROM view_dashboard_admin_extended ORDER BY student_id DESC"
+    );
+    res.json(result.rows);
   } catch (err) {
-    console.error('Error obteniendo dashboard admin:', err);
-    res.status(500).json({ 
-      message: 'Error al obtener dashboard',
-      error: process.env.NODE_ENV === 'development' ? err.message : 'Error interno del servidor'
+    console.error("Error obteniendo dashboard admin:", err);
+    res.status(500).json({
+      message: "Error al obtener dashboard",
+      error:
+        process.env.NODE_ENV === "development"
+          ? err.message
+          : "Error interno del servidor",
     });
   }
 };
@@ -19,26 +24,27 @@ exports.getDashboard = async (req, res) => {
 exports.getAnalytics = async (req, res) => {
   try {
     const { cycle_id, student_id } = req.query;
-    let sql = 'SELECT * FROM analytics_summary WHERE 1=1';
+    let sql = "SELECT * FROM analytics_summary WHERE 1=1";
     const params = [];
+    let paramIndex = 1;
 
     if (cycle_id) {
-      sql += ' AND cycle_id = ?';
+      sql += ` AND cycle_id = $${paramIndex++}`;
       params.push(cycle_id);
     }
 
     if (student_id) {
-      sql += ' AND student_id = ?';
+      sql += ` AND student_id = $${paramIndex++}`;
       params.push(student_id);
     }
 
-    sql += ' ORDER BY updated_at DESC';
+    sql += " ORDER BY updated_at DESC";
 
-    const [rows] = await db.query(sql, params);
-    res.json(rows);
+    const result = await db.query(sql, params);
+    res.json(result.rows);
   } catch (err) {
-    console.error('Error obteniendo analytics:', err);
-    res.status(500).json({ message: 'Error al obtener analytics' });
+    console.error("Error obteniendo analytics:", err);
+    res.status(500).json({ message: "Error al obtener analytics" });
   }
 };
 
@@ -53,25 +59,25 @@ exports.getNotifications = async (req, res) => {
       WHERE 1=1
     `;
     const params = [];
+    let paramIndex = 1;
 
     if (student_id) {
-      sql += ' AND nl.student_id = ?';
+      sql += ` AND nl.student_id = $${paramIndex++}`;
       params.push(student_id);
     }
 
     if (type) {
-      sql += ' AND nl.type = ?';
+      sql += ` AND nl.type = $${paramIndex++}`;
       params.push(type);
     }
 
-    sql += ' ORDER BY nl.sent_at DESC LIMIT ?';
+    sql += ` ORDER BY nl.sent_at DESC LIMIT $${paramIndex++}`;
     params.push(parseInt(limit));
 
-    const [rows] = await db.query(sql, params);
-    res.json(rows);
+    const result = await db.query(sql, params);
+    res.json(result.rows);
   } catch (err) {
-    console.error('Error obteniendo notificaciones:', err);
-    res.status(500).json({ message: 'Error al obtener notificaciones' });
+    console.error("Error obteniendo notificaciones:", err);
+    res.status(500).json({ message: "Error al obtener notificaciones" });
   }
 };
-
