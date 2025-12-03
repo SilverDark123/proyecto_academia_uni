@@ -4,7 +4,7 @@ Este directorio contiene las pruebas automatizadas para verificar el flujo compl
 
 ## Requisitos Previos
 
-1. **Base de datos MySQL**: Asegúrate de que la base de datos `academia_final` esté creada y las tablas estén inicializadas.
+1. **Base de datos PostgreSQL**: Asegúrate de que la base de datos `academia_final` esté creada y las tablas estén inicializadas.
 2. **Servidor corriendo**: El servidor debe estar ejecutándose en `http://localhost:4000`
 3. **Variables de entorno**: Asegúrate de tener un archivo `.env` con `JWT_SECRET` configurado
 4. **Dependencias**: Ejecuta `npm install` en el directorio `backend`
@@ -83,19 +83,23 @@ Al final se mostrará un resumen con el número de pruebas exitosas y fallidas.
 ## Solución de Problemas
 
 ### Error: "Servidor no responde"
+
 - Verifica que el servidor esté corriendo en `http://localhost:4000`
 - Verifica que no haya errores en la consola del servidor
 
 ### Error: "Admin no encontrado"
+
 - Ejecuta `node scripts/createAdmin.js` para crear el administrador
 - Verifica que el usuario admin exista en la tabla `users`
 
 ### Error: "Base de datos no conectada"
-- Verifica que MySQL esté corriendo
+
+- Verifica que PostgreSQL esté corriendo
 - Verifica las credenciales en `db.js`
 - Verifica que la base de datos `academia_final` exista
 
 ### Error: "JWT_SECRET no configurado"
+
 - Crea un archivo `.env` en el directorio `backend`
 - Agrega `JWT_SECRET=tu_secreto_aqui` al archivo `.env`
 
@@ -104,4 +108,3 @@ Al final se mostrará un resumen con el número de pruebas exitosas y fallidas.
 - Las pruebas crean datos de prueba en la base de datos
 - Después de las pruebas, puedes limpiar los datos de prueba manualmente
 - Las pruebas usan datos específicos (DNIs, nombres, etc.) que pueden necesitar limpieza
-

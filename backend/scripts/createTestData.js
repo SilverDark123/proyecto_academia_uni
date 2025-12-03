@@ -1,78 +1,94 @@
 // scripts/createTestData.js
-const mysql = require('mysql2/promise');
-const bcrypt = require('bcrypt');
-require('dotenv').config();
+const { Client } = require("pg");
+const bcrypt = require("bcrypt");
+require("dotenv").config();
 
 async function createTestData() {
   try {
     // Conectar a la base de datos
-    const connection = await mysql.createConnection({
-      host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || 'TochielVroXd12',
-      database: process.env.DB_NAME || 'academia'
+    const client = new Client({
+      host: process.env.DB_HOST || "localhost",
+      user: process.env.DB_USER || "postgres",
+      password: process.env.DB_PASSWORD || "postgres",
+      database: process.env.DB_NAME || "academia_final",
     });
+
+    await client.connect();
 
     // Insertar profesores de prueba
     const teachers = [
       {
-        dni: '12345678',
-        name: 'Juan Pérez',
-        phone: '987654321',
-        email: 'juan.perez@example.com',
-        bio: 'Profesor de Matemáticas con 10 años de experiencia'
+        dni: "12345678",
+        name: "Juan Pérez",
+        phone: "987654321",
+        email: "juan.perez@example.com",
+        bio: "Profesor de Matemáticas con 10 años de experiencia",
       },
       {
-        dni: '87654321',
-        name: 'María García',
-        phone: '987654322',
-        email: 'maria.garcia@example.com',
-        bio: 'Profesora de Física con doctorado en Física Cuántica'
+        dni: "87654321",
+        name: "María García",
+        phone: "987654322",
+        email: "maria.garcia@example.com",
+        bio: "Profesora de Física con doctorado en Física Cuántica",
       },
       {
-        dni: '23456789',
-        name: 'Carlos López',
-        phone: '987654323',
-        email: 'carlos.lopez@example.com',
-        bio: 'Profesor de Química con experiencia en investigación'
-      }
+        dni: "23456789",
+        name: "Carlos López",
+        phone: "987654323",
+        email: "carlos.lopez@example.com",
+        bio: "Profesor de Química con experiencia en investigación",
+      },
     ];
 
     for (const teacher of teachers) {
       // Insertar profesor
-      const [result] = await connection.execute(
-        'INSERT INTO teachers (name, phone, email, bio) VALUES (?, ?, ?, ?)',
-        [teacher.name, teacher.phone, teacher.email, teacher.bio]
+      // Note: splitting name into first and last for compatibility with new schema if needed,
+      // but assuming schema matches init-db.sql which has first_name, last_name.
+      // Wait, init-db.sql has first_name, last_name. The original script used 'name'.
+      // I should split the name.
+      const parts = teacher.name.split(" ");
+      const firstName = parts[0];
+      const lastName = parts.slice(1).join(" ");
+
+      const result = await client.query(
+        "INSERT INTO teachers (first_name, last_name, dni, phone, email, specialization) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+        [
+          firstName,
+          lastName,
+          teacher.dni,
+          teacher.phone,
+          teacher.email,
+          teacher.bio,
+        ] // Assuming bio maps to specialization or similar? init-db has specialization.
       );
 
       // Crear cuenta de usuario para el profesor
-      const hashedPassword = await bcrypt.hash('profesor123', 10);
-      await connection.execute(
-        'INSERT INTO users (username, password_hash, role, related_id) VALUES (?, ?, ?, ?)',
-        [teacher.dni, hashedPassword, 'teacher', result.insertId]
+      const hashedPassword = await bcrypt.hash("profesor123", 10);
+      await client.query(
+        "INSERT INTO users (username, password_hash, role, related_id) VALUES ($1, $2, $3, $4)",
+        [teacher.dni, hashedPassword, "teacher", result.rows[0].id]
       );
 
       console.log(`Profesor creado: ${teacher.name}`);
       console.log(`DNI (usuario): ${teacher.dni}`);
       console.log(`Contraseña: profesor123`);
-      console.log('-------------------');
+      console.log("-------------------");
     }
 
     // También actualizamos el usuario admin con un DNI
-    await connection.execute(
-      'UPDATE users SET username = ? WHERE username = ?',
-      ['99999999', 'admin']
-    );
+    await client.query("UPDATE users SET username = $1 WHERE username = $2", [
+      "99999999",
+      "admin",
+    ]);
 
-    console.log('Usuario admin actualizado:');
-    console.log('DNI (usuario): 99999999');
-    console.log('Contraseña: admin123');
+    console.log("Usuario admin actualizado:");
+    console.log("DNI (usuario): 99999999");
+    console.log("Contraseña: admin123");
 
-    await connection.end();
-    console.log('Datos de prueba creados exitosamente');
-
+    await client.end();
+    console.log("Datos de prueba creados exitosamente");
   } catch (err) {
-    console.error('Error al crear datos de prueba:', err);
+    console.error("Error al crear datos de prueba:", err);
   }
 }
 

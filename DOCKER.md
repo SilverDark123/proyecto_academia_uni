@@ -12,7 +12,7 @@
 
    - Frontend: http://localhost:5173
    - Backend API: http://localhost:4000
-   - MySQL: localhost:3306
+   - PostgreSQL: localhost:5432
 
 3. **Create admin user (first time only):**
    ```bash
@@ -62,7 +62,7 @@ docker-compose down -v
 docker-compose logs -f
 docker-compose logs backend
 docker-compose logs frontend
-docker-compose logs mysql
+docker-compose logs postgres
 ```
 
 **Rebuild specific service:**
@@ -75,7 +75,7 @@ docker-compose up --build backend
 
 ```bash
 docker-compose exec backend sh
-docker-compose exec mysql mysql -uroot -proot123 academia_final
+docker-compose exec postgres psql -U postgres -d academia_final
 ```
 
 ## Notes
@@ -84,4 +84,4 @@ docker-compose exec mysql mysql -uroot -proot123 academia_final
 - Data persists in Docker volumes even after stopping containers
 - Backend hot-reloads on code changes (volume mounted)
 - Frontend hot-reloads on code changes (volume mounted)
-- MySQL password is `root123` (change in docker-compose.yml if needed)
+- PostgreSQL password is `postgres` (change in docker-compose.yml if needed)
