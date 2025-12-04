@@ -3,22 +3,67 @@ from models.enrollment import EnrollmentCreate, EnrollmentStatusUpdate
 from datetime import date, timedelta
 
 async def get_student_enrollments(student_id: int, db: asyncpg.Connection):
+    """Get student enrollments with installments - matches Node.js getByStudent"""
     enrollments = await db.fetch(
         """SELECT e.*, 
                   COALESCE(c.name, p.name) as item_name,
+                  COALESCE(COALESCE(co.price_override, c.base_price), COALESCE(po.price_override, p.base_price)) as item_price,
                   COALESCE(co.group_label, po.group_label) as group_label,
-                  cyc.name as cycle_name
+                  cyc.name as cycle_name,
+                  cyc.start_date as cycle_start_date,
+                  cyc.end_date as cycle_end_date,
+                  pp.id as payment_plan_id,
+                  pp.total_amount,
+                  pp.installments as total_installments,
+                  (
+                    SELECT STRING_AGG(
+                             c2.name || 
+                             CASE
+                               WHEN co2.group_label IS NOT NULL AND co2.group_label <> ''
+                                 THEN ' (Grupo ' || co2.group_label || ')'
+                               ELSE ''
+                             END,
+                             ', '
+                           )
+                    FROM enrollments e2
+                    JOIN course_offerings co2 ON e2.course_offering_id = co2.id
+                    JOIN courses c2 ON co2.course_id = c2.id
+                    WHERE e2.student_id = e.student_id
+                      AND e2.enrollment_type = 'course'
+                      AND e2.status != 'cancelado'
+                      AND e2.package_offering_id = e.package_offering_id
+                  ) AS package_courses_summary
            FROM enrollments e
            LEFT JOIN course_offerings co ON e.course_offering_id = co.id
            LEFT JOIN courses c ON co.course_id = c.id
            LEFT JOIN package_offerings po ON e.package_offering_id = po.id
            LEFT JOIN packages p ON po.package_id = p.id
            LEFT JOIN cycles cyc ON cyc.id = COALESCE(co.cycle_id, po.cycle_id)
+           LEFT JOIN payment_plans pp ON pp.enrollment_id = e.id
            WHERE e.student_id = $1
            ORDER BY e.registered_at DESC""",
         student_id
     )
-    return [dict(e) for e in enrollments]
+    
+    # For each enrollment, get its installments (like Node.js)
+    result = []
+    for enrollment in enrollments:
+        enr_dict = dict(enrollment)
+        
+        if enr_dict.get('payment_plan_id'):
+            installments = await db.fetch(
+                """SELECT * FROM installments 
+                   WHERE payment_plan_id = $1 
+                   ORDER BY installment_number""",
+                enr_dict['payment_plan_id']
+            )
+            enr_dict['installments'] = [dict(i) for i in installments]
+        else:
+            enr_dict['installments'] = []
+        
+        result.append(enr_dict)
+    
+    return result
 
 async def get_enrollments_by_offering(type: str, id: int, status: str, db: asyncpg.Connection):
     where = "e.enrollment_type = $1 AND e.status = $2"
@@ -131,6 +176,36 @@ async def create_enrollment(student_id: int, data: EnrollmentCreate, db: asyncpg
         })
     
     return {"message": "Matrículas creadas correctamente", "created": created}
+
+async def cancel_enrollment(student_id: int, enrollment_id: int, db: asyncpg.Connection):
+    """Cancel own enrollment (student only) - like Node.js"""
+    # Verify enrollment belongs to student
+    enrollment = await db.fetchrow(
+        "SELECT * FROM enrollments WHERE id = $1 AND student_id = $2",
+        enrollment_id, student_id
+    )
+    
+    if not enrollment:
+        return {"error": "Matrícula no encontrada"}
+    
+    if enrollment['status'] != 'pendiente':
+        return {"error": "Solo se pueden cancelar matrículas pendientes"}
+    
+    # Check if there are payments or vouchers
+    has_payments = await db.fetchrow(
+        """SELECT COUNT(*) as count FROM installments i
+           JOIN payment_plans pp ON i.payment_plan_id = pp.id
+           WHERE pp.enrollment_id = $1 AND (i.status != 'pending' OR i.voucher_path IS NOT NULL)""",
+        enrollment_id
+    )
+    
+    if has_payments and has_payments['count'] > 0:
+        return {"error": "No se puede cancelar una matrícula con pagos o vouchers registrados"}
+    
+    # Delete enrollment (cascade will delete payment plan and installments)
+    await db.execute("DELETE FROM enrollments WHERE id = $1", enrollment_id)
+    
+    return {"message": "Matrícula cancelada correctamente"}
 
 async def update_enrollment_status(data: EnrollmentStatusUpdate, db: asyncpg.Connection):
     # Check payment status if accepting

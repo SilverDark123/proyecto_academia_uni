@@ -3,7 +3,13 @@ from models.teacher import TeacherCreate, TeacherUpdate, AttendanceCreate
 
 async def get_all_teachers(db: asyncpg.Connection):
     teachers = await db.fetch("SELECT * FROM teachers ORDER BY last_name, first_name")
-    return [dict(t) for t in teachers]
+    # Add 'name' field for frontend compatibility (like Node.js)
+    result = []
+    for t in teachers:
+        teacher_dict = dict(t)
+        teacher_dict['name'] = f"{t['first_name']} {t['last_name']}"
+        result.append(teacher_dict)
+    return result
 
 async def get_teacher_by_id(teacher_id: int, db: asyncpg.Connection):
     teacher = await db.fetchrow("SELECT * FROM teachers WHERE id = $1", teacher_id)
@@ -53,6 +59,11 @@ async def update_teacher(teacher_id: int, data: TeacherUpdate, db: asyncpg.Conne
     await db.execute(query, *values)
     return {"message": "Docente actualizado correctamente"}
 
+async def delete_teacher(teacher_id: int, db: asyncpg.Connection):
+    """Delete teacher - matches Node.js logic"""
+    await db.execute("DELETE FROM teachers WHERE id = $1", teacher_id)
+    return {"message": "Profesor eliminado correctamente"}
+
 async def reset_teacher_password(teacher_id: int, db: asyncpg.Connection):
     from utils.security import get_password_hash
     
@@ -79,6 +90,7 @@ async def get_teacher_students(teacher_id: int, db: asyncpg.Connection):
     return [dict(s) for s in students]
 
 async def mark_attendance(teacher_id: int, data: AttendanceCreate, db: asyncpg.Connection):
+    """Mark attendance - matches Node.js logic with enrollment check and notifications"""
     from datetime import date
     
     # Verify teacher owns this schedule
@@ -90,7 +102,23 @@ async def mark_attendance(teacher_id: int, data: AttendanceCreate, db: asyncpg.C
     )
     
     if not schedule or schedule['teacher_id'] != teacher_id:
-        return None
+        return {"error": "No tienes permiso para marcar asistencia en este curso"}
+    
+    # Verify student has accepted enrollment in this course (like Node.js)
+    enrollment_check = await db.fetchrow(
+        """SELECT e.id
+           FROM enrollments e
+           JOIN schedules s ON s.course_offering_id = e.course_offering_id
+           WHERE s.id = $1
+             AND e.student_id = $2
+             AND e.enrollment_type = 'course'
+             AND e.status = 'aceptado'
+           LIMIT 1""",
+        data.schedule_id, data.student_id
+    )
+    
+    if not enrollment_check:
+        return {"error": "El estudiante no tiene una matrícula aceptada en este curso"}
     
     # Check if attendance already exists
     existing = await db.fetchrow(
@@ -111,4 +139,30 @@ async def mark_attendance(teacher_id: int, data: AttendanceCreate, db: asyncpg.C
             data.student_id, data.schedule_id, date.today(), data.status
         )
     
-    return {"message": "Asistencia registrada correctamente"}
+    # If absent, check total absences and notify parent if >= 3 (like Node.js)
+    if data.status == "ausente":
+        absences = await db.fetchrow(
+            """SELECT COUNT(*) as count FROM attendance 
+               WHERE student_id = $1 AND status = 'ausente' AND schedule_id = $2""",
+            data.student_id, data.schedule_id
+        )
+        
+        if absences and absences['count'] >= 3:
+            student = await db.fetchrow(
+                "SELECT * FROM students WHERE id = $1",
+                data.student_id
+            )
+            
+            if student and student['parent_phone']:
+                try:
+                    from utils.notifications import send_notification_to_parent
+                    await send_notification_to_parent(
+                        data.student_id,
+                        student['parent_phone'],
+                        f"Su hijo/a {student['first_name']} {student['last_name']} ha acumulado {absences['count']} faltas en este horario",
+                        "absences_3"
+                    )
+                except Exception as notif_err:
+                    print(f"Error enviando notificación: {notif_err}")
+    
+    return {"message": "Asistencia marcada correctamente"}

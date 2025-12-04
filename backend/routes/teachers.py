@@ -26,6 +26,10 @@ async def create_teacher(teacher: TeacherCreate, db: asyncpg.Connection = Depend
 async def update_teacher(teacher_id: int, teacher: TeacherUpdate, db: asyncpg.Connection = Depends(get_db)):
     return await teacherController.update_teacher(teacher_id, teacher, db)
 
+@router.delete("/{teacher_id}", dependencies=[Depends(require_role(["admin"]))])
+async def delete_teacher(teacher_id: int, db: asyncpg.Connection = Depends(get_db)):
+    return await teacherController.delete_teacher(teacher_id, db)
+
 @router.post("/{teacher_id}/reset-password", dependencies=[Depends(require_role(["admin"]))])
 async def reset_password(teacher_id: int, db: asyncpg.Connection = Depends(get_db)):
     result = await teacherController.reset_teacher_password(teacher_id, db)
@@ -45,6 +49,8 @@ async def mark_attendance(
     db: asyncpg.Connection = Depends(get_db)
 ):
     result = await teacherController.mark_attendance(teacher_id, attendance, db)
+    if result and "error" in result:
+        raise HTTPException(status_code=403, detail=result["error"])
     if not result:
         raise HTTPException(status_code=403, detail="No autorizado para este horario")
     return result

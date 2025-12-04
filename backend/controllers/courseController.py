@@ -3,7 +3,39 @@ from models.course import CourseCreate, CourseUpdate, CourseOfferingCreate, Cour
 
 async def get_all_courses(db: asyncpg.Connection):
     courses = await db.fetch("SELECT * FROM courses ORDER BY name")
-    return [dict(c) for c in courses]
+    courses_list = []
+    
+    for course in courses:
+        course_dict = dict(course)
+        
+        # Get offerings for this course
+        offerings = await db.fetch(
+            """SELECT co.*, cyc.name as cycle_name, 
+                      t.first_name, t.last_name
+               FROM course_offerings co
+               LEFT JOIN cycles cyc ON co.cycle_id = cyc.id
+               LEFT JOIN teachers t ON co.teacher_id = t.id
+               WHERE co.course_id = $1
+               ORDER BY cyc.start_date DESC, co.group_label""",
+            course['id']
+        )
+        
+        offerings_list = []
+        for offering in offerings:
+            offering_dict = dict(offering)
+            
+            # Get schedules for this offering (like Node.js)
+            schedules = await db.fetch(
+                "SELECT * FROM schedules WHERE course_offering_id = $1",
+                offering['id']
+            )
+            offering_dict['schedules'] = [dict(s) for s in schedules]
+            offerings_list.append(offering_dict)
+        
+        course_dict['offerings'] = offerings_list
+        courses_list.append(course_dict)
+    
+    return courses_list
 
 async def create_course(data: CourseCreate, db: asyncpg.Connection):
     result = await db.fetchrow(

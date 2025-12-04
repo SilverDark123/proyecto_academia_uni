@@ -11,11 +11,17 @@ async def create_schedule(data: ScheduleCreate, db: asyncpg.Connection):
         st = st.strftime("%H:%M:%S")
     else:
         st = str(st)
+        # Add seconds if not present (HH:MM -> HH:MM:00)
+        if st.count(':') == 1:
+            st = st + ":00"
         
     if hasattr(et, 'strftime'):
         et = et.strftime("%H:%M:%S")
     else:
         et = str(et)
+        # Add seconds if not present (HH:MM -> HH:MM:00)
+        if et.count(':') == 1:
+            et = et + ":00"
     
     # Convert to time objects for asyncpg
     h, m, s = map(int, st.split(':'))

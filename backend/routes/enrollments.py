@@ -59,6 +59,26 @@ async def update_status(update: EnrollmentStatusUpdate, db: asyncpg.Connection =
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
+@router.post("/cancel", dependencies=[Depends(require_role(["student"]))])
+async def cancel_enrollment(
+    data: dict,
+    current_user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db)
+):
+    """Cancel own enrollment (student only) - like Node.js"""
+    student_id = current_user.get("id")
+    if not student_id:
+        raise HTTPException(status_code=401, detail="No autenticado")
+    
+    enrollment_id = data.get("enrollment_id")
+    if not enrollment_id:
+        raise HTTPException(status_code=400, detail="Falta enrollment_id")
+    
+    result = await enrollmentController.cancel_enrollment(student_id, enrollment_id, db)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
 @router.get("/admin", dependencies=[Depends(require_role(["admin"]))])
 async def get_admin_enrollments(db: asyncpg.Connection = Depends(get_db)):
     return await enrollmentController.get_admin_enrollments(db)

@@ -1,58 +1,61 @@
 import asyncpg
 
 async def get_dashboard_data(db: asyncpg.Connection):
+    """Get dashboard using the extended view (like Node.js)"""
     dashboard = await db.fetch(
-        """SELECT 
-            e.id as enrollment_id,
-            e.student_id,
-            s.first_name || ' ' || s.last_name as student_name,
-            s.dni,
-            s.phone,
-            s.parent_name,
-            s.parent_phone,
-            cyc.id as cycle_id,
-            cyc.name as cycle_name,
-            cyc.start_date,
-            cyc.end_date,
-            e.enrollment_type,
-            COALESCE(co.group_label, po.group_label) as grupo,
-            COALESCE(c.name, p.name) as enrolled_item,
-            e.status as enrollment_status,
-            COUNT(DISTINCT CASE WHEN a.status = 'presente' THEN a.id END) as attendance_count,
-            COUNT(DISTINCT a.id) as total_classes,
-            CASE 
-                WHEN COUNT(DISTINCT a.id) > 0 
-                THEN ROUND(COUNT(DISTINCT CASE WHEN a.status = 'presente' THEN a.id END)::numeric / COUNT(DISTINCT a.id)::numeric * 100, 2)
-                ELSE 0 
-            END as attendance_pct,
-            COALESCE(SUM(CASE WHEN i.status = 'paid' THEN i.amount ELSE 0 END), 0) as total_paid,
-            COALESCE(SUM(pp.total_amount) - SUM(CASE WHEN i.status = 'paid' THEN i.amount ELSE 0 END), 0) as pending_amount,
-            COUNT(DISTINCT CASE WHEN a.status = 'ausente' THEN a.id END) as total_absences,
-            CASE 
-                WHEN COUNT(DISTINCT CASE WHEN a.status = 'ausente' THEN a.id END) >= 3 THEN 'Alerta: 3+ faltas'
-                WHEN COALESCE(SUM(pp.total_amount) - SUM(CASE WHEN i.status = 'paid' THEN i.amount ELSE 0 END), 0) > 0 THEN 'Pago pendiente'
-                ELSE 'OK'
-            END as alert_status
-        FROM enrollments e
-        JOIN students s ON e.student_id = s.id
-        LEFT JOIN course_offerings co ON e.course_offering_id = co.id
-        LEFT JOIN courses c ON co.course_id = c.id
-        LEFT JOIN package_offerings po ON e.package_offering_id = po.id
-        LEFT JOIN packages p ON po.package_id = p.id
-        LEFT JOIN cycles cyc ON cyc.id = COALESCE(co.cycle_id, po.cycle_id)
-        LEFT JOIN payment_plans pp ON pp.enrollment_id = e.id
-        LEFT JOIN installments i ON i.payment_plan_id = pp.id
-        LEFT JOIN schedules sch ON sch.course_offering_id = COALESCE(e.course_offering_id, 
-            (SELECT poc.course_offering_id FROM package_offering_courses poc WHERE poc.package_offering_id = e.package_offering_id LIMIT 1))
-        LEFT JOIN attendance a ON a.student_id = e.student_id AND a.schedule_id = sch.id
-        WHERE e.status = 'aceptado'
-        GROUP BY e.id, e.student_id, s.first_name, s.last_name, s.dni, s.phone, s.parent_name, s.parent_phone,
-                 cyc.id, cyc.name, cyc.start_date, cyc.end_date, e.enrollment_type, grupo, enrolled_item, e.status
-        ORDER BY s.last_name, s.first_name"""
+        "SELECT * FROM view_dashboard_admin_extended ORDER BY student_id DESC"
     )
     return [dict(d) for d in dashboard]
 
-async def get_analytics(cycle_id: int, db: asyncpg.Connection):
+async def get_analytics(cycle_id: int, student_id: int, db: asyncpg.Connection):
+    """Get analytics summary - matches Node.js logic"""
+    sql = "SELECT * FROM analytics_summary WHERE 1=1"
+    params = []
+    param_index = 1
+    
+    if cycle_id:
+        sql += f" AND cycle_id = ${param_index}"
+        params.append(cycle_id)
+        param_index += 1
+    
+    if student_id:
+        sql += f" AND student_id = ${param_index}"
+        params.append(student_id)
+        param_index += 1
+    
+    sql += " ORDER BY updated_at DESC"
+    
+    analytics = await db.fetch(sql, *params)
+    return [dict(a) for a in analytics]
+
+async def get_notifications(student_id: int, notification_type: str, limit: int, db: asyncpg.Connection):
+    """Get notifications - matches Node.js logic"""
+    sql = """
+        SELECT nl.*, s.first_name, s.last_name, s.dni
+        FROM notifications_log nl
+        JOIN students s ON nl.student_id = s.id
+        WHERE 1=1
+    """
+    params = []
+    param_index = 1
+    
+    if student_id:
+        sql += f" AND nl.student_id = ${param_index}"
+        params.append(student_id)
+        param_index += 1
+    
+    if notification_type:
+        sql += f" AND nl.type = ${param_index}"
+        params.append(notification_type)
+        param_index += 1
+    
+    sql += f" ORDER BY nl.sent_at DESC LIMIT ${param_index}"
+    params.append(limit if limit else 50)
+    
+    notifications = await db.fetch(sql, *params)
+    return [dict(n) for n in notifications]
+
+async def get_analytics_old(cycle_id: int, db: asyncpg.Connection):
     analytics = await db.fetch(
         """SELECT 
             cyc.id as cycle_id,

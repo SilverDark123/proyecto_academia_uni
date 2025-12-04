@@ -1,10 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from middleware.auth import require_role
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from middleware.auth import require_role, get_current_user
 from config.database import get_db
 import asyncpg
 import controllers.paymentController as paymentController
 
 router = APIRouter(prefix="/payments", tags=["payments"])
+
+# Get all installments with optional status filter (like Node.js)
+@router.get("", dependencies=[Depends(require_role(["admin"]))])
+async def get_payments(status: str = None, db: asyncpg.Connection = Depends(get_db)):
+    return await paymentController.get_all_installments(status, db)
+
+@router.get("/pending", dependencies=[Depends(require_role(["admin"]))])
+async def get_pending(db: asyncpg.Connection = Depends(get_db)):
+    return await paymentController.get_pending_payments(db)
 
 @router.get("/plan/{enrollment_id}")
 async def get_plan(enrollment_id: int, db: asyncpg.Connection = Depends(get_db)):
@@ -20,22 +29,51 @@ async def get_installments(payment_plan_id: int, db: asyncpg.Connection = Depend
 @router.post("/upload-voucher/{installment_id}")
 async def upload_voucher(
     installment_id: int,
-    file: UploadFile = File(...),
+    file: UploadFile = File(..., alias="voucher"),
+    current_user: dict = Depends(get_current_user),
     db: asyncpg.Connection = Depends(get_db)
 ):
-    return await paymentController.upload_voucher(installment_id, file, db)
-
-@router.get("/pending", dependencies=[Depends(require_role(["admin"]))])
-async def get_pending(db: asyncpg.Connection = Depends(get_db)):
-    return await paymentController.get_pending_payments(db)
-
-@router.put("/approve/{installment_id}", dependencies=[Depends(require_role(["admin"]))])
-async def approve(installment_id: int, db: asyncpg.Connection = Depends(get_db)):
-    result = await paymentController.approve_payment(installment_id, db)
-    if not result:
-        raise HTTPException(status_code=404, detail="Cuota no encontrada")
+    student_id = current_user.get("id")
+    result = await paymentController.upload_voucher(installment_id, file, student_id, db)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
     return result
 
-@router.put("/reject/{installment_id}", dependencies=[Depends(require_role(["admin"]))])
-async def reject(installment_id: int, db: asyncpg.Connection = Depends(get_db)):
-    return await paymentController.reject_payment(installment_id, db)
+@router.post("/upload")
+async def upload_voucher_alt(
+    file: UploadFile = File(..., alias="voucher"),
+    installment_id: int = Form(None),
+    current_user: dict = Depends(get_current_user),
+    db: asyncpg.Connection = Depends(get_db)
+):
+    """Alternative upload endpoint for compatibility (like Node.js) - accepts Form data"""
+    if not installment_id:
+        raise HTTPException(status_code=400, detail="installment_id es requerido")
+    student_id = current_user.get("id")
+    result = await paymentController.upload_voucher(installment_id, file, student_id, db)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+# Approve installment (like Node.js)
+@router.post("/approve", dependencies=[Depends(require_role(["admin"]))])
+async def approve_post(data: dict, db: asyncpg.Connection = Depends(get_db)):
+    installment_id = data.get("installment_id")
+    if not installment_id:
+        raise HTTPException(status_code=400, detail="installment_id es requerido")
+    result = await paymentController.approve_installment(installment_id, db)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+# Reject installment (like Node.js)
+@router.post("/reject", dependencies=[Depends(require_role(["admin"]))])
+async def reject_post(data: dict, db: asyncpg.Connection = Depends(get_db)):
+    installment_id = data.get("installment_id")
+    reason = data.get("reason")
+    if not installment_id:
+        raise HTTPException(status_code=400, detail="installment_id es requerido")
+    result = await paymentController.reject_installment(installment_id, reason, db)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result

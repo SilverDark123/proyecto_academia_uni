@@ -16,17 +16,21 @@ class PackageCreate(BaseModel):
     name: str
     description: Optional[str] = None
     base_price: float
+    course_ids: Optional[List[int]] = None
 
 class PackageUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     base_price: Optional[float] = None
+    course_ids: Optional[List[int]] = None
 
 class PackageOfferingCreate(BaseModel):
     package_id: int
     cycle_id: int
-    group_label: str
+    group_label: Optional[str] = None
     price_override: Optional[float] = None
+    capacity: Optional[int] = None
+    course_offering_ids: Optional[List[int]] = None
 
 class PackageOfferingUpdate(BaseModel):
     group_label: Optional[str] = None

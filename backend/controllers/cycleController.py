@@ -40,3 +40,12 @@ async def update_cycle(cycle_id: int, data: CycleUpdate, db: asyncpg.Connection)
 async def delete_cycle(cycle_id: int, db: asyncpg.Connection):
     await db.execute("DELETE FROM cycles WHERE id = $1", cycle_id)
     return {"message": "Ciclo eliminado correctamente"}
+
+async def get_active_cycle(db: asyncpg.Connection):
+    """Get the currently active cycle (status='open')"""
+    cycle = await db.fetchrow(
+        "SELECT * FROM cycles WHERE status = 'open' ORDER BY start_date DESC LIMIT 1"
+    )
+    if not cycle:
+        return None
+    return dict(cycle)

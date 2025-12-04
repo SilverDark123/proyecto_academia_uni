@@ -13,8 +13,14 @@ async def create_schedule(schedule: ScheduleCreate, db: asyncpg.Connection = Dep
         raise HTTPException(status_code=400, detail="course_offering_id es requerido")
     return await scheduleController.create_schedule(schedule, db)
 
+# Support both naming conventions
 @router.get("/course-offering/{course_offering_id}")
 async def get_schedules_by_offering(course_offering_id: int, db: asyncpg.Connection = Depends(get_db)):
+    return await scheduleController.get_schedules_by_offering(course_offering_id, db)
+
+@router.get("/offering/{course_offering_id}")
+async def get_schedules_by_offering_alt(course_offering_id: int, db: asyncpg.Connection = Depends(get_db)):
+    """Alternative endpoint for compatibility"""
     return await scheduleController.get_schedules_by_offering(course_offering_id, db)
 
 @router.get("/package-offering/{package_offering_id}")

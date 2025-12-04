@@ -32,53 +32,58 @@ async def register_student(data: StudentCreate, db: asyncpg.Connection):
     }
 
 async def login_user(credentials: UserLogin, db: asyncpg.Connection):
-    # Try student first
-    student = await db.fetchrow(
-        "SELECT id, dni, first_name, last_name, password_hash FROM students WHERE dni = $1",
-        credentials.dni
-    )
-    
-    if student and verify_password(credentials.password, student['password_hash']):
-        token = create_access_token({"id": student['id'], "role": "student"})
-        return {
-            "token": token,
-            "user": {
-                "id": student['id'],
-                "dni": student['dni'],
-                "role": "student",
-                "first_name": student['first_name'],
-                "last_name": student['last_name']
-            }
-        }
-    
-    # Try user (admin/teacher)
+    """Login - matches Node.js logic: check users table first, then students"""
+    # First try users table (admin/teacher) - like Node.js
     user = await db.fetchrow(
         "SELECT id, username, role, password_hash, related_id FROM users WHERE username = $1",
         credentials.dni
     )
     
-    if not user:
+    if user:
+        if not verify_password(credentials.password, user['password_hash']):
+            return {"error": "Contraseña incorrecta"}
+        
+        # Build user data
+        user_data = {
+            "id": user['id'],
+            "username": user['username'],
+            "role": user['role']
+        }
+        
+        # Get additional info for teacher (like Node.js)
+        if user['role'] == 'teacher' and user['related_id']:
+            teacher = await db.fetchrow(
+                "SELECT first_name, last_name, email FROM teachers WHERE id = $1",
+                user['related_id']
+            )
+            if teacher:
+                user_data['name'] = f"{teacher['first_name']} {teacher['last_name']}"
+                user_data['email'] = teacher['email']
+                user_data['related_id'] = user['related_id']
+        
+        token = create_access_token({"id": user['id'], "role": user['role']})
+        return {"token": token, "user": user_data}
+    
+    # If not in users, try student table - like Node.js
+    student = await db.fetchrow(
+        "SELECT id, dni, first_name, last_name, password_hash FROM students WHERE dni = $1",
+        credentials.dni
+    )
+    
+    if not student:
         return {"error": "Usuario no encontrado"}
     
-    if not verify_password(credentials.password, user['password_hash']):
-        return {"error": "Contraseña incorrecta"}
+    if not verify_password(credentials.password, student['password_hash']):
+        return {"error": "DNI o contraseña incorrectos"}
     
-    token = create_access_token({"id": user['id'], "role": user['role']})
+    token = create_access_token({"id": student['id'], "role": "student"})
     
-    user_data = {
-        "id": user['id'],
-        "username": user['username'],
-        "role": user['role']
+    return {
+        "token": token,
+        "user": {
+            "id": student['id'],
+            "dni": student['dni'],
+            "role": "student",
+            "name": f"{student['first_name']} {student['last_name']}"
+        }
     }
-    
-    # Get additional info for teacher
-    if user['role'] == 'teacher' and user['related_id']:
-        teacher = await db.fetchrow(
-            "SELECT first_name, last_name FROM teachers WHERE id = $1",
-            user['related_id']
-        )
-        if teacher:
-            user_data['first_name'] = teacher['first_name']
-            user_data['last_name'] = teacher['last_name']
-    
-    return {"token": token, "user": user_data}

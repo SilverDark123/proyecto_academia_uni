@@ -11,6 +11,13 @@ router = APIRouter(prefix="/cycles", tags=["cycles"])
 async def get_cycles(db: asyncpg.Connection = Depends(get_db)):
     return await cycleController.get_all_cycles(db)
 
+@router.get("/active")
+async def get_active_cycle(db: asyncpg.Connection = Depends(get_db)):
+    cycle = await cycleController.get_active_cycle(db)
+    if not cycle:
+        raise HTTPException(status_code=404, detail="No hay ciclo activo")
+    return cycle
+
 @router.get("/{cycle_id}")
 async def get_cycle(cycle_id: int, db: asyncpg.Connection = Depends(get_db)):
     cycle = await cycleController.get_cycle_by_id(cycle_id, db)
