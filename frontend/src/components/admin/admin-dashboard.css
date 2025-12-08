@@ -437,3 +437,116 @@
 .cursor-pointer input {
     cursor: pointer !important;
 }
+
+/* =========================================
+   CALENDARIO VISUAL (NUEVO)
+   ========================================= */
+
+.calendar-container {
+    background: var(--white);
+    border: 1px solid var(--admin-border);
+    box-shadow: var(--shadow-sm);
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: 60px repeat(7, 1fr);
+    width: 100%;
+    min-width: 900px;
+    background: #fff;
+    border: 1px solid var(--admin-border);
+}
+
+/* Cabeceras */
+.calendar-header-cell {
+    padding: 10px;
+    background: var(--gray-50);
+    border-bottom: 2px solid var(--admin-border);
+    border-right: 1px solid var(--admin-border);
+    text-align: center;
+    font-weight: 700;
+    position: sticky; top: 0; z-index: 10;
+}
+
+.calendar-header-cell.day-col {
+    text-transform: uppercase;
+    font-size: var(--text-xs);
+    letter-spacing: 1px;
+}
+
+/* IMPORTANTE: Altura fija de 60px para el cálculo matemático */
+.calendar-time-cell {
+    height: 60px; 
+    border-right: 1px solid var(--admin-border);
+    border-bottom: 1px solid var(--gray-100);
+    display: flex; justify-content: center; padding-top: 5px;
+    font-size: 11px; color: var(--gray-500);
+    position: relative;
+    top: -8px; /* Pequeño ajuste visual para alinear el texto con la línea */
+}
+
+/* Celdas del cuerpo del calendario */
+.calendar-cell {
+    height: 60px; /* Altura exacta */
+    border-right: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--gray-100); /* Línea sólida más suave */
+    position: relative;
+    transition: background 0.2s;
+    cursor: pointer;
+}
+
+.calendar-cell:hover {
+    background-color: #f8fafc;
+}
+
+.calendar-cell:hover::after {
+    content: '+';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 20px;
+    color: var(--gray-400);
+}
+
+/* Bloques de eventos (Las clases) */
+.calendar-event {
+    position: absolute;
+    left: 2px; right: 2px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    /* El fondo y borde se definen en línea via React */
+    font-size: 11px;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 5; /* Asegura que flote sobre las líneas */
+    transition: transform 0.2s, box-shadow 0.2s;
+    line-height: 1.2;
+}
+
+.calendar-event:hover {
+    transform: scale(1.02);
+    z-index: 10;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+}
+
+.event-time {
+    font-size: 10px;
+    font-weight: 700;
+    margin-bottom: 1px;
+}
+
+.event-title {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.event-details {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    opacity: 0.8;
+}
+

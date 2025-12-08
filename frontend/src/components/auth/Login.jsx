@@ -87,7 +87,6 @@ const Login = () => {
         const data = await response.json();
         
         if (response.ok) {
-          // EN LUGAR DE ALERT, MOSTRAMOS NORMAS
           setShowRules(true); 
           registerFormik.resetForm();
         } else {
@@ -190,6 +189,14 @@ const Login = () => {
             )}
             
             <button type="submit">Iniciar Sesión</button>
+
+            {/* OPCIÓN: NO TENGO CUENTA */}
+            <div className="switch-text-container">
+              <p>¿No tienes una cuenta?</p>
+              <span className="switch-link" onClick={() => setIsActive(true)}>
+                Regístrate aquí
+              </span>
+            </div>
           </form>
         </div>
 
@@ -258,7 +265,6 @@ const Login = () => {
               </div>
             </div>
             
-            {/* Mensajes de error generales del formulario */}
             {(Object.keys(registerFormik.errors).length > 0 && registerFormik.touched.dni) && (
                  <div className="error-message" style={{textAlign: 'center', marginBottom: '10px'}}>
                     Por favor completa todos los campos correctamente.
@@ -266,6 +272,14 @@ const Login = () => {
             )}
 
             <button type="submit">Registrarse</button>
+
+            {/* OPCIÓN: YA TENGO CUENTA */}
+            <div className="switch-text-container">
+              <p>¿Ya tienes una cuenta?</p>
+              <span className="switch-link" onClick={() => setIsActive(false)}>
+                Inicia Sesión
+              </span>
+            </div>
           </form>
         </div>
 
