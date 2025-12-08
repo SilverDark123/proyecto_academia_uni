@@ -5,6 +5,9 @@ import { createTheme } from '@mui/material/styles';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
 
+// Landing
+import LandingPage from './components/landing/LandingPage';
+
 // Auth
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
@@ -107,8 +110,8 @@ function App() {
               <Route path="attendance" element={<TeacherAttendance />} />
             </Route>
 
-            {/* Default Route */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            {/* Landing Page */}
+            <Route path="/" element={<LandingPage />} />
           </Routes>
         </Router>
       </AuthProvider>
